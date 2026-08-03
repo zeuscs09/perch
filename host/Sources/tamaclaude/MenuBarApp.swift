@@ -223,7 +223,33 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             self?.ble.sendConfig(WiFiCommand.forget(ssid: ssid).payload)
         }
         window.onBoardHost = { [weak self] host in self?.chooseBoardHost(host) }
+        window.onSearchPlace = { [weak self] query in self?.searchPlace(query) }
+        window.onPickPlace = { [weak self] place in self?.savePlace(place) }
+        window.onClearPlace = { [weak self] in
+            Weather.clear()
+            self?.prefs.showPlace(nil)
+        }
         return window
+    }
+
+    /// ค้นชื่อเมือง — งานเน็ตอย่างเดียวที่เริ่มจากการกดปุ่มของผู้ใช้
+    private func searchPlace(_ query: String) {
+        Task { [weak self] in
+            let found = await Weather.search(query)
+            await MainActor.run { self?.prefs.showPlaces(found) }
+        }
+    }
+
+    private func savePlace(_ place: Weather.Place) {
+        let location = place.location
+        do {
+            try Weather.save(location)
+            prefs.showPlace(location)
+            // ไม่ต้องสั่งดึงใหม่เอง — pulse ของ daemon เรียก poller ทุกวินาทีอยู่แล้ว
+            // และ poller เห็นว่าพิกัดในไฟล์เปลี่ยนก็จะทิ้งค่าเก่าแล้วยิงใหม่ทันที
+        } catch {
+            Log.info("saving location failed: \(error)")
+        }
     }
 
     private func chooseBoardHost(_ host: String) {
@@ -248,6 +274,7 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         prefs.showBoardHost(UserDefaults.standard.string(forKey: Self.boardHostKey) ?? "")
         prefs.showRoute(route, detail: lanStatus)
         prefs.showKey(keyState)
+        prefs.showPlace(Weather.location())
         prefs.show()
         // ถามสถานะซ้ำเสมอ: บอร์ดรายงานตอนมันเปลี่ยน ซึ่งอาจเป็นก่อนที่หน้าต่างนี้จะมีตัวตน
         ble.sendConfig(WiFiCommand.status.payload)

@@ -22,6 +22,11 @@ final class PreferencesWindowController: NSWindowController {
     var onOpenLog: (() -> Void)?
     var onOpenProject: (() -> Void)?
 
+    /// ค้นชื่อเมือง — ผลกลับมาทาง `showPlaces`
+    var onSearchPlace: ((String) -> Void)?
+    var onPickPlace: ((Weather.Place) -> Void)?
+    var onClearPlace: (() -> Void)?
+
     var onScan: (() -> Void)?
     var onJoin: ((String, String) -> Void)?
     var onForget: ((String) -> Void)?
@@ -40,6 +45,12 @@ final class PreferencesWindowController: NSWindowController {
     private let loginBox = NSButton(checkboxWithTitle: "Launch at login", target: nil,
                                     action: nil)
     private let keyLabel = NSTextField(labelWithString: "")
+
+    // --- ที่ตั้งสำหรับพยากรณ์อากาศ --------------------------------------------
+    private let placeField = NSTextField()
+    private let placeResults = NSPopUpButton()
+    private let placeLabel = NSTextField(labelWithString: "")
+    private var places: [Weather.Place] = []
 
     // --- Wi-Fi --------------------------------------------------------------
     private let statusLabel = NSTextField(labelWithString: "")
@@ -174,6 +185,10 @@ final class PreferencesWindowController: NSWindowController {
             row("Session key", key),
             row("", keyLabel),
             separator(),
+            row("Weather", buildPlaceSearch()),
+            row("", placeResults),
+            row("", placeLabel),
+            separator(),
             row("", statuslineBox),
             row("", autoStartBox),
             row("", loginBox),
@@ -185,6 +200,35 @@ final class PreferencesWindowController: NSWindowController {
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 10
+        return stack
+    }
+
+    /// ช่องค้นเมือง + ปุ่มปิดฟีเจอร์
+    ///
+    /// ปุ่ม Off อยู่ตรงนี้ ไม่ใช่ในเมนูซ่อน เพราะ "ไม่ตั้งพิกัด" คือสถานะเดียวที่ daemon
+    /// ไม่ยิงเน็ตออกนอกเครื่องเลย ผู้ใช้ควรกลับไปหามันได้ง่ายพอๆ กับตอนเปิด
+    private func buildPlaceSearch() -> NSView {
+        placeField.placeholderString = "City name, e.g. Chiang Mai"
+        placeField.target = self
+        placeField.action = #selector(searchPlace)   // กด Enter ในช่อง = ค้น
+        placeField.widthAnchor.constraint(equalToConstant: 190).isActive = true
+
+        let find = NSButton(title: "Search", target: self, action: #selector(searchPlace))
+        let off = NSButton(title: "Off", target: self, action: #selector(clearPlace))
+        for button in [find, off] { button.bezelStyle = .rounded }
+        off.toolTip = "Stop showing weather — the app stops calling the network"
+
+        placeResults.target = self
+        placeResults.action = #selector(placePicked)
+        placeResults.isHidden = true
+        placeResults.widthAnchor.constraint(equalToConstant: 280).isActive = true
+
+        placeLabel.font = .systemFont(ofSize: 11)
+        placeLabel.textColor = .secondaryLabelColor
+
+        let stack = NSStackView(views: [placeField, find, off])
+        stack.orientation = .horizontal
+        stack.spacing = 6
         return stack
     }
 
@@ -299,6 +343,49 @@ final class PreferencesWindowController: NSWindowController {
         keyLabel.textColor = state.isProblem ? .systemRed : .secondaryLabelColor
     }
 
+    /// ที่ตั้งที่บันทึกไว้ — nil = ปิดอยู่
+    func showPlace(_ location: Weather.Location?) {
+        places = []
+        placeResults.isHidden = true
+        placeResults.removeAllItems()
+        guard let location else {
+            placeLabel.stringValue = "Off — no weather, and nothing leaves this Mac."
+            placeLabel.textColor = .secondaryLabelColor
+            placeField.stringValue = ""
+            return
+        }
+        let name = location.name ?? "Unnamed"
+        placeLabel.stringValue = String(
+            format: "%@ · %.4f, %.4f", name, location.latitude, location.longitude)
+        placeLabel.textColor = .secondaryLabelColor
+        placeField.stringValue = ""
+    }
+
+    func showSearching() {
+        places = []
+        placeResults.isHidden = true
+        placeLabel.stringValue = "Searching…"
+        placeLabel.textColor = .secondaryLabelColor
+    }
+
+    /// ผลค้นหา — ว่างแปลว่าไม่เจอ ซึ่งต้องบอกให้ชัดเพราะช่องค้นไม่มีอะไรเปลี่ยนเลย
+    func showPlaces(_ found: [Weather.Place]) {
+        places = found
+        guard !found.isEmpty else {
+            placeResults.isHidden = true
+            placeLabel.stringValue = "No place by that name. Try the English spelling."
+            placeLabel.textColor = .systemRed
+            return
+        }
+        placeResults.removeAllItems()
+        placeResults.addItem(withTitle: "Pick a place…")
+        for place in found { placeResults.addItem(withTitle: place.label) }
+        placeResults.selectItem(at: 0)
+        placeResults.isHidden = false
+        placeLabel.stringValue = "\(found.count) found — pick one to save it."
+        placeLabel.textColor = .secondaryLabelColor
+    }
+
     /// ทางที่ snapshot เดินอยู่จริง — คนละเรื่องกับ "บอร์ดต่อ WiFi แล้ว"
     ///
     /// บอร์ดที่ขึ้นเน็ตสำเร็จแต่ Mac หาไม่เจอ (client isolation, คนละ subnet) จะดูดีทุกอย่าง
@@ -382,6 +469,22 @@ final class PreferencesWindowController: NSWindowController {
     @objc private func loginToggled() { onToggleLogin?() }
     @objc private func openLog() { onOpenLog?() }
     @objc private func openProject() { onOpenProject?() }
+
+    @objc private func searchPlace() {
+        let query = placeField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+        showSearching()
+        onSearchPlace?(query)
+    }
+
+    @objc private func placePicked() {
+        // ช่องแรกเป็นหัวข้อ ไม่ใช่ตัวเลือก
+        let index = placeResults.indexOfSelectedItem - 1
+        guard index >= 0, index < places.count else { return }
+        onPickPlace?(places[index])
+    }
+
+    @objc private func clearPlace() { onClearPlace?() }
 
     @objc private func rescan() {
         beginScan()

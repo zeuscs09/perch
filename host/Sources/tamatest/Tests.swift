@@ -1956,6 +1956,40 @@ func runAllTests() {
         expect(!FileManager.default.fileExists(atPath: marker.path),
                "and the child is dead, not merely abandoned to finish in the background")
     }
+
+    suite("a place name the board cannot draw is not a place name") {
+        // ฟอนต์บนบอร์ดคือ `lv_font_montserrat_12` ซึ่งมีแต่ ASCII — ชื่อที่หลุดออกนอกช่วงนี้
+        // ไม่ได้แสดงผลเพี้ยน แต่กลายเป็นกล่องเปล่า การถอดเสียงจึงเป็นเงื่อนไข ไม่ใช่ความสวย
+        func isASCII(_ s: String) -> Bool { s.unicodeScalars.allSatisfy { $0.isASCII } }
+
+        equal(Weather.latin("Bangkok"), "Bangkok", "a latin name passes through untouched")
+        equal(Weather.latin("Kraków"), "Krakow", "diacritics are flattened, not dropped")
+        for name in ["ภูเก็ต", "เชียงใหม่", "กรุงเทพมหานคร", "東京", "Москва"] {
+            let out = Weather.latin(name)
+            expect(isASCII(out), "\(name) becomes drawable: \(out)")
+            expect(!out.isEmpty, "\(name) leaves something behind to draw")
+        }
+        // ถอดแล้วไม่เหลืออะไรเลยดีกว่าเหลือของที่วาดไม่ได้ — ปลายทางเช็ค isEmpty ต่อเอง
+        equal(Weather.latin("🌤️"), "", "a name with nothing drawable in it comes back empty")
+
+        let place = Weather.Place(name: "ภูเก็ต", admin1: "Phuket", country: "Thailand",
+                                  latitude: 7.89059, longitude: 98.3981)
+        expect(isASCII(place.location.name ?? ""),
+               "what gets saved for the board is already drawable")
+        equal(place.location.latitude, 7.89059, "and the coordinates ride along untouched")
+
+        // จังหวัดกับประเทศคือสิ่งที่แยกชื่อซ้ำข้ามประเทศ แต่ชื่อที่ซ้ำกับตัวเองคือเสียงรบกวน
+        equal(Weather.Place(name: "Phuket", admin1: "Phuket", country: "Thailand",
+                            latitude: 0, longitude: 0).label,
+              "Phuket, Thailand", "a province with the same name as its city is said once")
+        equal(Weather.Place(name: "Chiang Mai", admin1: "Chiang Mai", country: "Thailand",
+                            latitude: 0, longitude: 0).label,
+              "Chiang Mai, Thailand", "same rule whatever the name")
+        equal(Weather.Place(name: "Springfield", admin1: "Illinois", country: "United States",
+                            latitude: 0, longitude: 0).label,
+              "Springfield, Illinois, United States",
+              "and the parts that differ are all kept — they are the whole point")
+    }
 }
 
 /// ที่พักข้อมูลข้ามคิวสำหรับเทสต์ socket
