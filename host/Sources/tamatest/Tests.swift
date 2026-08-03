@@ -1917,6 +1917,45 @@ func runAllTests() {
         cold.update(ble: false, lan: false, now: t0 + 10)
         expect(cold.wantsLan, "a mac that starts out of range still tries the lan")
     }
+
+    suite("a child that hangs is killed, not waited on") {
+        // ชุดนี้ตรึงบั๊กที่ทำให้เครื่องล่มจริง: `TmuxSession` เคยรอด้วย `waitUntilExit()`
+        // เปล่าๆ ตัวเรียกคือ hook ที่ยิงทุกครั้งที่เอเจนต์ใช้เครื่องมือ คูณจำนวน session
+        // พอ tmux ค้าง hook ก็ค้างตาม สะสม 7,000 กระบวนการจนเครื่องหมดโควตา fork
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sub-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        equal(Subprocess.run("/bin/sh", ["-c", "echo hello"], timeout: 5)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              "hello", "an ordinary command still returns its output")
+        expect(Subprocess.run("/bin/sh", ["-c", "exit 3"], timeout: 5) == nil,
+               "a non-zero exit is not an answer")
+        expect(Subprocess.run("/nope/not/here", [], timeout: 5) == nil,
+               "a binary that is not there comes back rather than throwing")
+
+        // ผลลัพธ์ที่ใหญ่กว่าบัฟเฟอร์ของ pipe (64KB) — ถ้าอ่านบนคิวเดียวกับที่รอ
+        // ลูกจะบล็อกตอนเขียนและเราจะบล็อกตอนรอ ค้างทั้งคู่โดยไม่มีใครหมดเวลา
+        let big = Subprocess.run("/bin/sh", ["-c", "yes hello | head -20000"], timeout: 10)
+        equal(big?.split(separator: "\n").count, 20000,
+              "output past the pipe buffer comes back whole instead of deadlocking")
+
+        // หัวใจของชุดนี้: ลูกที่ไม่ยอมจบต้องไม่ลากเราไปด้วย
+        let marker = dir.appendingPathComponent("late.txt")
+        let began = Date()
+        let hung = Subprocess.run(
+            "/bin/sh", ["-c", "sleep 3; echo late > '\(marker.path)'"], timeout: 0.4)
+        let waited = Date().timeIntervalSince(began)
+        expect(hung == nil, "a child that outlives its timeout produces nothing")
+        expect(waited < 2.0, "and we come back on time, not when it does: \(waited)s")
+
+        // กลับมาตรงเวลาแต่ปล่อยลูกไว้ คือบั๊กเดิมทุกประการ — ต่างแค่ว่าใครเป็นคนค้าง
+        // ให้เวลาเลย 3 วิที่ลูกตั้งใจจะเขียนไฟล์ ถ้าไฟล์ไม่โผล่แปลว่ามันถูกฆ่าจริง
+        Thread.sleep(forTimeInterval: 3.4)
+        expect(!FileManager.default.fileExists(atPath: marker.path),
+               "and the child is dead, not merely abandoned to finish in the background")
+    }
 }
 
 /// ที่พักข้อมูลข้ามคิวสำหรับเทสต์ socket

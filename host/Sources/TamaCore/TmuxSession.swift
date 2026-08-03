@@ -11,10 +11,34 @@ import Foundation
 ///
 /// **ต้องหาในกระบวนการของ hook เท่านั้น** — `TMUX_PANE` สืบทอดมาจาก Claude Code
 /// ที่รันอยู่ใน pane นั้นจริงๆ พอส่งเข้า socket แล้ว daemon อยู่คนละสาย หาไม่ได้อีก
+///
+/// ## เรื่องที่ต้องระวังที่สุดในไฟล์นี้: ต้นทุนของการ fork
+///
+/// hook ถูกเรียก *ทุกครั้งที่ agent เรียกเครื่องมือ* คูณด้วยจำนวน session ที่เปิดอยู่
+/// เครื่องที่รันหลายสิบทีมพร้อมกันจึงเรียกไฟล์นี้เป็นพันครั้งต่อนาที ทุกกระบวนการที่
+/// ไฟล์นี้ยอมให้ค้างจะกลายเป็น process ที่ไม่มีวันตาย
+///
+/// เคยเกิดขึ้นจริง: เวอร์ชันแรก fork `tmux` สองตัวต่อหนึ่ง hook แล้วรอด้วย
+/// `waitUntilExit()` เปล่าๆ พอเครื่องเข้าใกล้เพดาน process ตัว `tmux` เองก็ fork ไม่ได้
+/// และค้าง ทำให้ hook ค้างตาม สะสมจนแตะ 7,000 กระบวนการค้างและเครื่องหมดโควตา
+/// ซึ่งย้อนกลับมาทำให้ทุกอย่างค้างหนักขึ้นอีก
+///
+/// กติกาสองข้อจึงห้ามผ่อน: **หนึ่ง hook ต่อหนึ่ง fork** และ **ทุกการรอมีเพดานเวลา**
 public enum TmuxSession {
+    /// เพดานเวลาของทุกคำสั่ง — tmux ที่ตอบไม่ได้ใน 1.5 วิ คือ tmux ที่กำลังมีปัญหา
+    /// รอต่อไม่ได้ช่วยอะไร ป้ายชื่อที่หายไปหนึ่งใบดีกว่ากระบวนการที่ไม่ตาย
+    private static let timeout: TimeInterval = 1.5
+
     /// จำผลไว้ตลอดอายุ process — hook เป็น process อายุสั้น ยิงครั้งเดียวก็จบ
-    /// แต่ถ้าวันหนึ่งมันถูกเรียกซ้ำ ก็ไม่ต้อง fork tmux ใหม่
+    /// แต่ฝั่ง daemon อยู่ยาว การจำจึงเป็นสิ่งที่กันไม่ให้มันยิง tmux ทุกจังหวะ
     nonisolated(unsafe) private static var cached: String??
+    nonisolated(unsafe) private static var cachedPanes: [Pane]?
+
+    public struct Pane {
+        public var session: String
+        public var id: String
+        public var path: String
+    }
 
     public static func current(env: [String: String] = ProcessInfo.processInfo.environment)
         -> String? {
@@ -25,66 +49,50 @@ public enum TmuxSession {
     }
 
     /// รายชื่อ session ทั้งหมด — ใช้ตัดสินว่าคำนำหน้า/ต่อท้ายไหนซ้ำจนตัดทิ้งได้
+    ///
+    /// อ่านจากผลชุดเดียวกับที่ใช้หา pane ไม่ได้ยิง `list-sessions` แยกอีกรอบ:
+    /// pane ทุกตัวบอกชื่อ session ของมันอยู่แล้ว การถามซ้ำคือการ fork ฟรีๆ
     public static func allNames() -> [String] {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        task.arguments = ["tmux", "list-sessions", "-F", "#{session_name}"]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-        guard (try? task.run()) != nil else { return [] }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        task.waitUntilExit()
-        guard task.terminationStatus == 0 else { return [] }
-        return String(decoding: data, as: UTF8.self)
-            .split(separator: "\n").map(String.init).filter { !$0.isEmpty }
+        var seen = Set<String>()
+        return panes().compactMap { seen.insert($0.session).inserted ? $0.session : nil }
+    }
+
+    /// ทุกอย่างที่ไฟล์นี้ต้องรู้ มาจากคำสั่งเดียวนี้คำสั่งเดียว
+    private static func panes() -> [Pane] {
+        if let cachedPanes { return cachedPanes }
+        let rows = run(["list-panes", "-a", "-F",
+                        "#{session_name}\t#{pane_id}\t#{pane_current_path}"])
+            .map { text in
+                text.split(separator: "\n").compactMap { line -> Pane? in
+                    let parts = line.split(separator: "\t", maxSplits: 2)
+                    guard parts.count == 3, !parts[0].isEmpty else { return nil }
+                    return Pane(session: String(parts[0]), id: String(parts[1]),
+                                path: String(parts[2]))
+                }
+            } ?? []
+        cachedPanes = rows
+        return rows
     }
 
     private static func resolve(env: [String: String]) -> String? {
-        // ไม่ได้อยู่ใน tmux = ไม่ต้องเรียกอะไรเลย (เคสปกติของคนที่ไม่ได้ใช้ tmux)
+        // ไม่ได้อยู่ใน tmux = ไม่ต้อง fork อะไรเลย (เคสปกติของคนที่ไม่ได้ใช้ tmux)
         guard let pane = env["TMUX_PANE"], !pane.isEmpty, env["TMUX"] != nil else { return nil }
-
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        task.arguments = ["tmux", "display-message", "-p", "-t", pane, "#{session_name}"]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-
-        // hook ต้องจบเร็วเสมอ — tmux ที่ค้างต้องไม่ลากให้ session ของผู้ใช้ค้างตาม
-        guard (try? task.run()) != nil else { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        task.waitUntilExit()
-        guard task.terminationStatus == 0 else { return nil }
-
-        let name = String(decoding: data, as: UTF8.self)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return nil }
-        return SessionLabel.shorten(name, among: allNames())
+        guard let match = panes().first(where: { $0.id == pane }) else { return nil }
+        return SessionLabel.shorten(match.session, among: allNames())
     }
 
     /// หา session จาก cwd — ใช้กับ Codex ที่ไม่มี `TMUX_PANE` ให้เรา
     /// (เราอ่านไฟล์ rollout ของมันจากนอก pane) จับคู่ด้วยที่อยู่ของ pane ที่เปิดอยู่จริง
     public static func forWorkingDirectory(_ cwd: String) -> String? {
         guard !cwd.isEmpty else { return nil }
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        task.arguments = ["tmux", "list-panes", "-a", "-F", "#{session_name}\t#{pane_current_path}"]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-        guard (try? task.run()) != nil else { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        task.waitUntilExit()
-        guard task.terminationStatus == 0 else { return nil }
+        guard let match = panes().first(where: { $0.path == cwd }) else { return nil }
+        return SessionLabel.shorten(match.session, among: allNames())
+    }
 
-        for line in String(decoding: data, as: UTF8.self).split(separator: "\n") {
-            let parts = line.split(separator: "\t", maxSplits: 1)
-            guard parts.count == 2 else { continue }
-            if String(parts[1]) == cwd {
-                return SessionLabel.shorten(String(parts[0]), among: allNames())
-            }
-        }
-        return nil
+    /// daemon อยู่ยาวและ pane ย้ายได้ — ต้องมีทางล้างของที่จำไว้
+    public static func forgetPanes() { cachedPanes = nil }
+
+    private static func run(_ arguments: [String]) -> String? {
+        Subprocess.run("/usr/bin/env", ["tmux"] + arguments, timeout: timeout)
     }
 }
