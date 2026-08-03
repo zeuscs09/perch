@@ -146,7 +146,12 @@ public final class WeatherPoller: @unchecked Sendable {
             self.lock.lock()
             self.inFlight = false
             // ยิงพลาดแล้วเก็บค่าเดิมไว้ ไม่ล้างเป็นว่าง — เน็ตสะดุดไม่ได้แปลว่าฟ้าเปลี่ยน
-            if let result { self.latest = result }
+            if let result {
+                self.latest = result
+                Log.info("weather \(result.condition) \(result.temperature)C")
+            } else {
+                Log.info("weather fetch failed")
+            }
             self.lock.unlock()
         }
     }

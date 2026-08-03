@@ -26,13 +26,14 @@ static ct_state_t state_from_name(const char *name)
     return CT_STATE_IDLE;
 }
 
-// ตัวอักษรเดียวบนสาย ("c"/"x"/"a") — ประหยัดไบต์ในงบ MTU ที่แชร์กับ session และ card
+// ตัวอักษรเดียวบนสาย ("c"/"x"/"g") — ต้องตรงกับ AgentKind.wire ฝั่ง host
+// ไม่ใช่ตัวแรกของชื่อ: claude กับ codex ขึ้นต้น c เหมือนกัน — ประหยัดไบต์ในงบ MTU ที่แชร์กับ session และ card
 // ไม่มีคีย์ = daemon รุ่นก่อนมี multi-agent ซึ่งส่งแต่ session ของ Claude
 static ct_agent_t agent_from_name(const char *name)
 {
     if (!name) return CT_AGENT_CLAUDE;
     if (name[0] == 'x') return CT_AGENT_CODEX;
-    if (name[0] == 'a') return CT_AGENT_ANTIGRAVITY;
+    if (name[0] == 'g') return CT_AGENT_ANTIGRAVITY;
     return CT_AGENT_CLAUDE;
 }
 

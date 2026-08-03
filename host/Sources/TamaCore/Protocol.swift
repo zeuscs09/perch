@@ -160,7 +160,18 @@ public enum AgentKind: String, Codable, Equatable, Sendable, CaseIterable {
     case antigravity
 
     /// อักษรเดียวบนสาย — ประหยัดไบต์ในงบ 500 ที่แชร์กับ session และ card
-    public var wire: String { String(rawValue.prefix(1)) }
+    ///
+    /// เขียนตรงๆ ทีละตัว ไม่ derive จากตัวแรกของชื่อ: claude กับ codex ขึ้นต้นด้วย c
+    /// เหมือนกัน การ derive จึงทำให้ทั้งคู่ส่งค่าเดียวกันและบอร์ดแยกไม่ออก
+    /// (เคยพลาดมาแล้ว — มาสคอตของ Codex ขึ้นเป็นสีของ Claude ทุกตัว)
+    /// ค่าพวกนี้อยู่บนสาย ต้องตรงกับ `agent_from_name` ใน firmware/main/ct_model.c
+    public var wire: String {
+        switch self {
+        case .claude: return "c"
+        case .codex: return "x"
+        case .antigravity: return "g"
+        }
+    }
 
     public init?(wire: String) {
         guard let match = Self.allCases.first(where: { $0.wire == wire }) else { return nil }
