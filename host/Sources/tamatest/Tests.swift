@@ -1957,6 +1957,24 @@ func runAllTests() {
                "and the child is dead, not merely abandoned to finish in the background")
     }
 
+    suite("daemon แปลรหัส pane แทน hook — และยังแปลได้จริง") {
+        // ชุดนี้ตรึงการย้ายงานออกจาก hook: hook ส่งแต่รหัสดิบเพราะการ fork ที่นั่น
+        // เคยทำให้เครื่องหมดโควตากระบวนการสองครั้ง ถ้าฝั่ง daemon แปลไม่ได้ ราคาที่จ่าย
+        // คือป้ายใต้มาสคอตที่หายไปเงียบๆ ซึ่งไม่มีอะไรจับได้เลยนอกจากคนไปมองจอ
+        expect(TmuxSession.sessionName(forPane: "") == nil, "ไม่มีรหัสก็ไม่มีอะไรให้แปล")
+        expect(TmuxSession.sessionName(forPane: "%999999") == nil,
+               "pane ที่ไม่มีอยู่จริงต้องได้ nil ไม่ใช่ชื่อมั่ว")
+
+        // เครื่องที่รัน tmux อยู่ต้องแปล pane จริงได้ — ข้ามไปถ้าไม่มี tmux
+        if let out = Subprocess.run("/usr/bin/env",
+                                    ["tmux", "list-panes", "-a", "-F", "#{pane_id}"], timeout: 3),
+            let first = out.split(separator: "\n").first {
+            let name = TmuxSession.sessionName(forPane: String(first))
+            expect(name?.isEmpty == false,
+                   "pane ที่เปิดอยู่จริง (\(first)) ต้องแปลเป็นชื่อ session ได้: \(name ?? "nil")")
+        }
+    }
+
     suite("a place name the board cannot draw is not a place name") {
         // ฟอนต์บนบอร์ดคือ `lv_font_montserrat_12` ซึ่งมีแต่ ASCII — ชื่อที่หลุดออกนอกช่วงนี้
         // ไม่ได้แสดงผลเพี้ยน แต่กลายเป็นกล่องเปล่า การถอดเสียงจึงเป็นเงื่อนไข ไม่ใช่ความสวย
