@@ -679,7 +679,7 @@ static const uint16_t USAGE_PILL_COLORS[CT_USAGE_ROWS] = {CT_COL_CLAY, CT_COL_GO
 // ความกว้างของหนึ่งช่อง หลังหักช่องไฟระหว่างคอลัมน์
 #define USAGE_CELL_W ((USAGE_W - (CT_USAGE_COLS - 1) * CT_USAGE_GUTTER) / CT_USAGE_COLS)
 // pill แคบลงจาก 62 เพราะช่องแคบลงครึ่งหนึ่ง — ยังพอใส่ "Current" ที่ฟอนต์ 12
-#define USAGE_PILL_W 54
+#define USAGE_PILL_W 50
 
 // ช่อง i เรียงตามแถวก่อน (0,1 = แถวบน / 2,3 = แถวล่าง) — คู่ของ Claude จึงอยู่บรรทัด
 // เดียวกัน ซึ่งเป็นคู่ที่ต้องอ่านเทียบกันบ่อยที่สุด
@@ -916,12 +916,14 @@ static void usage_reset_text(const ct_usage_t *u, char *out, size_t cap)
         int d = u->remaining / 86400;
         int h = (u->remaining % 86400) / 3600;
         int m = (u->remaining % 3600) / 60;
+        // ไม่มีคำว่า "Resets in" — ในตาราง 2 คอลัมน์ช่องกว้างครึ่งเดียว ข้อความเต็ม
+        // (~90px) ล้นไปทับ pill ส่วน pill ก็บอกอยู่แล้วว่ากำลังอ่านหน้าต่างไหน
         if (d) {
-            snprintf(out, cap, "Resets in %dd %dh", d, h);
+            snprintf(out, cap, "%dd%dh", d, h);
         } else if (h) {
-            snprintf(out, cap, "Resets in %dh %02dm", h, m);
+            snprintf(out, cap, "%dh%02dm", h, m);
         } else {
-            snprintf(out, cap, "Resets in %dm", m);
+            snprintf(out, cap, "%dm", m);
         }
     }
 }
@@ -1051,7 +1053,7 @@ static void layout_usage(void)
         // ความกว้างของป้ายเลข % เพิ่งเปลี่ยนตามข้อความ ("100%" กว้างกว่า "35%" ~13px)
         // ต้องบังคับให้ LVGL คิดขนาดใหม่ก่อน ไม่งั้นจัดชิดกับความกว้างของเฟรมก่อนหน้า
         lv_obj_update_layout(row->percent);
-        lv_obj_align_to(row->reset, row->percent, LV_ALIGN_OUT_RIGHT_MID, 12, 0);
+        lv_obj_align_to(row->reset, row->percent, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
     }
 }
 
