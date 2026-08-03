@@ -18,6 +18,12 @@
 #define LOOP_MS 1000
 #define FRAME_MS 60
 
+// นานแค่ไหนที่แผงโควตาค้างอยู่หลังถูกแตะ
+//
+// สั้นกว่านี้อ่านสี่ช่องไม่ทัน ยาวกว่านี้แล้วการ์ดที่รอการกระทำถูกบังนานเกินกว่าที่
+// การถามครั้งเดียวควรได้ — แตะซ้ำต่อเวลาได้อยู่แล้ว
+#define CT_PEEK_MS 8000
+
 typedef struct {
     lv_obj_t *canvas;  // ตัววาดมาสคอต (วาดเองใน LV_EVENT_DRAW_MAIN)
     lv_obj_t *label;   // ป้ายชื่อโปรเจกต์
@@ -871,10 +877,17 @@ static uint16_t card_accent(ct_card_kind_t kind)
     }
 }
 
+// นับถอยหลังของการขอดูโควตา — ศูนย์คือกลับไปให้การ์ดครองพื้นที่ตามเดิม
+static int s_peek_ms = 0;
+
 // ทั้งการ์ดและโควตามาจาก host ทั้งคู่ ลิงก์หลุดแล้วไม่มีใครรับรองว่ายังจริง — พื้นที่ล่าง
 // จึงว่างทั้งแถบและตกเป็นของนาฬิกา ตรงกับ Screen.shown_{cards,usage}() ใน gen/screen.py
 static int shown_card_count(void)
 {
+    // ระหว่างที่ผู้ใช้ขอดูโควตา ให้ถือว่าไม่มีการ์ด — การ์ดกับแผงโควตาแย่งพื้นที่เดียวกัน
+    // และการ์ดชนะเสมอเพราะมันคือสิ่งที่ต้องการการกระทำ แต่ "ต้องการการกระทำ" กับ
+    // "ผู้ใช้กำลังเอานิ้วจิ้มถามอยู่เดี๋ยวนี้" อันหลังชนะ
+    if (s_peek_ms > 0) return 0;
     return s_connected ? s_snap.card_count : 0;
 }
 
@@ -1275,8 +1288,32 @@ void ct_ui_set_connected(bool connected)
     lv_obj_invalidate(s_stroll);
 }
 
+void ct_ui_peek_usage(void)
+{
+    // ไม่มีโควตาให้ดูก็ไม่ต้องทำอะไร — การซ่อนการ์ดทิ้งเพื่อโชว์ที่ว่างคือการลงโทษคนแตะ
+    if (!usage_shown()) return;
+    bool was_off = s_peek_ms == 0;
+    s_peek_ms = CT_PEEK_MS;
+    // แตะซ้ำระหว่างที่ยังโชว์อยู่ = ต่อเวลา ไม่ใช่วาดใหม่ทั้งจอ
+    if (!was_off) return;
+    layout_cards();
+    layout_usage();
+    layout_machine();
+    layout_usage_topbar();
+}
+
 void ct_ui_tick(void)
 {
+    if (s_peek_ms > 0) {
+        s_peek_ms -= FRAME_MS;
+        if (s_peek_ms <= 0) {
+            s_peek_ms = 0;
+            layout_cards();
+            layout_usage();
+            layout_machine();
+            layout_usage_topbar();
+        }
+    }
     s_phase += (float)FRAME_MS / (float)LOOP_MS;
     bool second_passed = false;
     while (s_phase >= 1.0f) {

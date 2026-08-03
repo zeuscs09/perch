@@ -1,6 +1,8 @@
 #include "ct_dim.h"
 
 #include "ct_lcd.h"
+#include "ct_touch.h"
+#include "esp_log.h"
 
 // ไม่มีใครแตะนานเท่านี้ = ไม่มีใครอยู่
 //
@@ -23,7 +25,6 @@
 static int s_user = 100;      // เพดานที่ผู้ใช้ตั้ง
 static int s_shown = 100;     // ค่าที่ส่งให้ไฟหลังไปแล้ว
 static int s_idle_ms = 0;
-static bool s_attention = false;
 
 static int dim_level(void)
 {
@@ -36,6 +37,9 @@ static int dim_level(void)
 static void apply(int percent)
 {
     if (percent == s_shown) return;
+    // พูดเฉพาะตอนถึงปลายทาง ไม่ใช่ทุกขั้นของการไล่ — ไม่งั้นการหรี่หนึ่งครั้งได้ 85 บรรทัด
+    if (percent == s_user && s_shown < s_user) ESP_LOGI("dim", "สว่างเต็ม %d%%", percent);
+    if (percent == dim_level() && s_shown > percent) ESP_LOGI("dim", "หรี่เหลือ %d%%", percent);
     s_shown = percent;
     ct_lcd_set_backlight(percent);
 }
@@ -62,15 +66,13 @@ void ct_dim_wake(void)
     apply(s_user);  // ทันที ไม่ไล่ขึ้น — คนที่เพิ่งแตะจอกำลังรอดูอยู่
 }
 
-void ct_dim_attention(bool needs_person)
-{
-    bool rising = needs_person && !s_attention;
-    s_attention = needs_person;
-    if (rising) ct_dim_wake();
-}
-
 void ct_dim_tick(int elapsed_ms)
 {
+    // อย่าดับสิ่งที่ตัวเองเปิดคืนไม่ได้ — จนกว่าจะเห็นการแตะติดสักครั้ง จอสว่างเต็มไว้ก่อน
+    if (!ct_touch_seen()) {
+        apply(s_user);
+        return;
+    }
     if (s_idle_ms < IDLE_MS) {
         s_idle_ms += elapsed_ms;
         if (s_idle_ms < IDLE_MS) {

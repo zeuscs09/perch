@@ -238,17 +238,6 @@ static void apply_pending(void)
         // ไม่ใช่เหตุการณ์ที่เกิดแล้วผ่านไป
         ct_led_apply(&snap, link || lan);
         ct_ui_set_snapshot(&snap);
-
-        // เกณฑ์เดียวกับที่ไฟใช้ตัดสินว่าต้องเต้น — จอกับไฟต้องไม่เถียงกันเรื่องว่า
-        // อะไรคือ "เรื่องที่ต้องมีคน" แค่ตอบคนละคำถามเกี่ยวกับมัน
-        bool needs_person = false;
-        if (link || lan) {
-            for (int i = 0; i < snap.session_count; i++) {
-                ct_state_t st = snap.sessions[i].state;
-                if (st == CT_STATE_WAITING || st == CT_STATE_ERROR) needs_person = true;
-            }
-        }
-        ct_dim_attention(needs_person);
     }
     if (backlight >= 0) ct_dim_set_user(backlight);
 }
@@ -311,7 +300,12 @@ void app_main(void)
         apply_pending();
         // อ่านการแตะทุกรอบ ไม่ใช่ทุกเฟรม — นิ้วที่แตะแล้วยกภายในเฟรมเดียวจะหายไป
         // ถ้ารอถึงจังหวะวาด และการอ่านขาหนึ่งขาถูกกว่าการวาดจอมาก
-        if (ct_touch_tapped(step_ms)) ct_dim_wake();
+        if (ct_touch_tapped(step_ms)) {
+            // นิ้วเดียวตอบสองอย่างที่คนที่เดินมาถึงโต๊ะอยากได้พร้อมกัน:
+            // เห็นจอชัด และเห็นว่าโควตาเหลือเท่าไร
+            ct_dim_wake();
+            ct_ui_peek_usage();
+        }
         ct_dim_tick(step_ms);
         since_frame += step_ms;
         if (since_frame >= 60) {  // ~16 เฟรมต่อวินาที พอสำหรับอนิเมชันบล็อกสี่เหลี่ยม
