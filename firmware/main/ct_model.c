@@ -133,6 +133,18 @@ bool ct_model_parse(const char *json, int len, ct_snapshot_t *out)
     // "w" = [condition, องศา C] — array ด้วยเหตุผลเดียวกับ "u" คือคีย์กินไบต์
     copy_str(tmp.place, sizeof(tmp.place), cJSON_GetObjectItem(root, "l"));
 
+    // "h" = [cpu%, mem%] — array ด้วยเหตุผลเดียวกับ "u"/"w" คือคีย์กินไบต์
+    const cJSON *mach = cJSON_GetObjectItem(root, "h");
+    if (cJSON_IsArray(mach)) {
+        const cJSON *cpu = cJSON_GetArrayItem(mach, 0);
+        const cJSON *mem = cJSON_GetArrayItem(mach, 1);
+        if (cJSON_IsNumber(cpu) && cJSON_IsNumber(mem)) {
+            tmp.cpu_pct = cpu->valueint;
+            tmp.mem_pct = mem->valueint;
+            tmp.has_machine = true;
+        }
+    }
+
     const cJSON *w = cJSON_GetObjectItem(root, "w");
     if (cJSON_IsArray(w)) {
         const cJSON *cond = cJSON_GetArrayItem(w, 0);

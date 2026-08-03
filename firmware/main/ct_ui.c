@@ -113,6 +113,19 @@ static slot_t s_slots[CT_SLOTS_COUNT];
 static card_t s_cards[CT_MAX_CARDS];
 static usage_row_t s_usage[CT_USAGE_ROWS];
 
+// เซลล์เครื่อง — สองบรรทัดเล็กในช่องที่ 4 ของตารางโควตา
+// ตั้งใจให้หน้าตาไม่เหมือนแถวโควตา เพราะมันเป็นค่าคนละชนิด (ไม่มีเส้นตายรีเซ็ต)
+// ถ้าทำให้เหมือนกัน ช่อง "resets in" ที่ว่างเปล่าจะอ่านเป็นข้อมูลขาด ไม่ใช่ดีไซน์
+static struct {
+    lv_obj_t *label[2];  // "CPU" / "RAM"
+    lv_obj_t *value[2];
+    lv_obj_t *track[2];
+    lv_obj_t *fill[2];
+} s_machine;
+#define MACHINE_LINE_H 18
+#define MACHINE_BAR_H 4
+#define MACHINE_LABEL_W 30
+
 static float s_phase = 0.0f;
 static int s_cycle = 0;
 
@@ -755,6 +768,39 @@ static void build_usage(lv_obj_t *scr)
     }
 }
 
+// ช่องที่ 4 ของตาราง (แถวล่าง คอลัมน์ขวา) — ที่เดียวกับที่ usage row 3 จะไปอยู่
+// ทั้งคู่ไม่เคยโผล่พร้อมกัน: daemon ส่ง usage มาแค่ 3 ช่อง ช่องที่ 4 จึงว่างเสมอ
+static void build_machine(lv_obj_t *scr)
+{
+    int x = usage_cell_x(3);
+    int y = usage_row_y(3);
+    for (int i = 0; i < 2; i++) {
+        int ly = y + i * MACHINE_LINE_H;
+
+        s_machine.label[i] = plain_label(scr, &lv_font_montserrat_12, CT_COL_TEXT_DIM);
+        lv_label_set_text(s_machine.label[i], i == 0 ? "CPU" : "RAM");
+        lv_obj_set_pos(s_machine.label[i], x, ly);
+
+        s_machine.value[i] = plain_label(scr, &lv_font_montserrat_12, CT_COL_TEXT);
+        lv_obj_set_pos(s_machine.value[i], x + MACHINE_LABEL_W, ly);
+
+        s_machine.track[i] = plain_obj(scr, USAGE_CELL_W - MACHINE_LABEL_W - 34, MACHINE_BAR_H);
+        lv_obj_set_style_bg_color(s_machine.track[i], ct_color(CT_COL_GRAY_DARK), 0);
+        lv_obj_set_style_bg_opa(s_machine.track[i], LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(s_machine.track[i], LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_pos(s_machine.track[i], x + MACHINE_LABEL_W + 34, ly + 5);
+
+        s_machine.fill[i] = plain_obj(s_machine.track[i], 1, MACHINE_BAR_H);
+        lv_obj_set_style_bg_opa(s_machine.fill[i], LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(s_machine.fill[i], LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_pos(s_machine.fill[i], 0, 0);
+
+        lv_obj_add_flag(s_machine.label[i], LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(s_machine.value[i], LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(s_machine.track[i], LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
 static void build_idle_clock(lv_obj_t *scr)
 {
     // ไม่มีอะไรต้องเตือน = ให้พื้นที่นี้ทำหน้าที่นาฬิกาตั้งโต๊ะแทน
@@ -782,6 +828,7 @@ void ct_ui_init(void)
     build_stroll(scr);
     build_cards(scr);
     build_usage(scr);
+    build_machine(scr);
     build_idle_clock(scr);
     ct_ui_set_snapshot(&s_snap);
 }
@@ -972,6 +1019,36 @@ static void layout_usage_topbar(void)
     lv_obj_remove_flag(s_usage_track, LV_OBJ_FLAG_HIDDEN);
 }
 
+static void layout_machine(void)
+{
+    // ตามแผงโควตาเสมอ — การ์ดชนะทั้งคู่ ด้วยเหตุผลเดียวกัน
+    bool show = s_snap.has_machine && usage_shown() && shown_card_count() == 0;
+    int pct[2] = {s_snap.cpu_pct, s_snap.mem_pct};
+    int track_w = USAGE_CELL_W - MACHINE_LABEL_W - 34;
+
+    for (int i = 0; i < 2; i++) {
+        if (!show) {
+            lv_obj_add_flag(s_machine.label[i], LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(s_machine.value[i], LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(s_machine.track[i], LV_OBJ_FLAG_HIDDEN);
+            continue;
+        }
+        int v = pct[i] < 0 ? 0 : (pct[i] > 100 ? 100 : pct[i]);
+        // ใช้เกณฑ์สีชุดเดียวกับโควตา — ผู้ใช้เรียนรู้ครั้งเดียวใช้ได้ทั้งจอ
+        uint16_t col = v >= CT_USAGE_CRIT_PCT ? CT_COL_ALERT
+                     : v >= CT_USAGE_WARN_PCT ? CT_COL_ACCENT
+                                              : CT_COL_GOOD;
+        lv_label_set_text_fmt(s_machine.value[i], "%d%%", v);
+        lv_obj_set_style_text_color(s_machine.value[i], ct_color(col), 0);
+        lv_obj_set_width(s_machine.fill[i], track_w * v / 100 > 0 ? track_w * v / 100 : 1);
+        lv_obj_set_style_bg_color(s_machine.fill[i], ct_color(col), 0);
+
+        lv_obj_remove_flag(s_machine.label[i], LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(s_machine.value[i], LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(s_machine.track[i], LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
 static void layout_usage(void)
 {
     // การ์ดชนะโควตาเสมอ — การ์ดคือสิ่งที่ต้องการการกระทำจากผู้ใช้
@@ -1083,6 +1160,7 @@ void ct_ui_set_snapshot(const ct_snapshot_t *snap)
     layout_slots();
     layout_cards();
     layout_usage();
+    layout_machine();
     layout_usage_topbar();
 }
 
@@ -1174,6 +1252,7 @@ void ct_ui_set_connected(bool connected)
     // แผงโควตาเข้า/ออกตามลิงก์ และนาฬิกาใหญ่ต้องกลับลงมายึดพื้นที่ที่มันปล่อยไว้
     layout_cards();
     layout_usage();
+    layout_machine();
     layout_usage_topbar();
     for (int i = 0; i < CT_SLOTS_COUNT; i++) lv_obj_invalidate(s_slots[i].canvas);
     lv_obj_invalidate(s_stroll);
@@ -1218,6 +1297,7 @@ void ct_ui_tick(void)
         if (usage_shown()) {
             if (shown_card_count() == 0) {
                 layout_usage();
+                layout_machine();
             } else {
                 layout_usage_topbar();
             }

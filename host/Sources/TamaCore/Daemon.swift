@@ -103,6 +103,7 @@ public final class Daemon {
         snapshot.usage = UsageReader.read(now: now)
         // ชื่อสถานที่มาจากไฟล์ตั้งค่า ไม่ใช่จากผลพยากรณ์ — ส่งได้แม้ยังดึงอากาศไม่สำเร็จ
         snapshot.place = Weather.location()?.name.map { Text.fit($0, to: 16) }
+        if let m = MachineLoad.sample() { snapshot.machine = [m.cpu, m.memory] }
         if let w = weather.reading {
             snapshot.weather = WeatherSnap(
                 condition: w.condition.rawValue, temperature: w.temperature)
