@@ -46,6 +46,29 @@ public final class CodexWatcher {
         return "codex-" + (uuid.isEmpty ? base : uuid)
     }
 
+    /// อ่าน cwd จาก `session_meta` ที่บรรทัดแรกของไฟล์
+    ///
+    /// **บรรทัดแรกไม่ใช่บรรทัดสั้น** — มันบรรจุ instructions/system prompt ทั้งก้อน
+    /// วัดจากไฟล์จริงได้ 18,453 ไบต์ การอ่านหัวมาแบบตายตัว 8KB จึงหา newline ไม่เจอ
+    /// แล้ว cwd หลุดทั้ง session (อาการ: ป้ายบนจอขึ้นว่า "codex" เฉยๆ ไม่บอกว่าทีมไหน)
+    ///
+    /// จึงอ่านทีละก้อนจนกว่าจะเจอจบบรรทัด โดยมีเพดานกันไฟล์ที่ไม่มี newline เลย
+    private static func cwdFromHead(_ handle: FileHandle, cap: Int = 1 << 20) -> String? {
+        try? handle.seek(toOffset: 0)
+        var head = Data()
+        while head.count < cap {
+            guard let more = try? handle.read(upToCount: 64 * 1024), !more.isEmpty else { break }
+            head.append(more)
+            guard let nl = head.firstIndex(of: 0x0A) else { continue }
+            guard let obj = try? JSONSerialization.jsonObject(with: head[head.startIndex..<nl])
+                as? [String: Any],
+                obj["type"] as? String == "session_meta"
+            else { return nil }
+            return (obj["payload"] as? [String: Any])?["cwd"] as? String
+        }
+        return nil
+    }
+
     /// เรียกจาก pulse ของ daemon — คืนเหตุการณ์ที่เพิ่งเกิดตั้งแต่ครั้งก่อน
     public func poll(now: Date = Date()) -> [HookEvent] {
         var events: [HookEvent] = []
@@ -95,13 +118,7 @@ public final class CodexWatcher {
         if known == nil {
             // ยกเว้น `session_meta` ที่บรรทัดแรก — cwd อยู่ในนั้นและมีที่เดียว
             // ถ้าข้ามไปด้วย session จะไม่มีชื่อโปรเจกต์ไปตลอดอายุของมัน
-            try? handle.seek(toOffset: 0)
-            if let head = try? handle.read(upToCount: 8 * 1024),
-                let nl = head.firstIndex(of: 0x0A),
-                let obj = try? JSONSerialization.jsonObject(with: head[head.startIndex..<nl])
-                    as? [String: Any],
-                obj["type"] as? String == "session_meta",
-                let cwd = (obj["payload"] as? [String: Any])?["cwd"] as? String {
+            if let cwd = Self.cwdFromHead(handle) {
                 state.cwd = cwd
                 state.tmux = TmuxSession.forWorkingDirectory(cwd)
             }
