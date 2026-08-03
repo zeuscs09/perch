@@ -192,13 +192,6 @@ static void on_wifi_status(ct_wifi_state_t st, const char *ssid, const char *ip,
 }
 
 // --- ลูปหลัก -----------------------------------------------------------------
-static bool has_alert(const ct_snapshot_t *s)
-{
-    for (int i = 0; i < s->card_count; i++) {
-        if (s->cards[i].kind == CT_CARD_ALERT) return true;
-    }
-    return false;
-}
 
 static void apply_pending(void)
 {
@@ -238,11 +231,10 @@ static void apply_pending(void)
         ct_ui_set_link(link, wifi, ip);
     }
     if (got_snapshot) {
-        static bool had_alert = false;
-        bool alert = has_alert(&snap);
-        // กะพริบเฉพาะตอนการเตือน *เกิดใหม่* ไม่ใช่ทุก snapshot ที่ยังมีการเตือนค้างอยู่
-        if (alert && !had_alert) ct_led_flash();
-        had_alert = alert;
+        // ไฟอ่านสถานะรวมจาก snapshot เดียวกับที่จอวาด — ไม่ใช่แค่กะพริบตอนมีการเตือนใหม่
+        // เพราะคำถามที่ไฟตอบคือ "ตอนนี้ต้องลุกไปทำอะไรไหม" ซึ่งเป็นสภาพต่อเนื่อง
+        // ไม่ใช่เหตุการณ์ที่เกิดแล้วผ่านไป
+        ct_led_apply(&snap, link || lan);
         ct_ui_set_snapshot(&snap);
     }
     if (backlight >= 0) ct_lcd_set_backlight(backlight);
