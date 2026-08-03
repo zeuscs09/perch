@@ -24,6 +24,9 @@ public struct HookEvent: Codable, Equatable, Sendable {
     /// Claude Code ไม่ส่งมา (มันไม่รู้ว่ามีเอเจนต์อื่น) จึงไม่มีคีย์นี้ = claude
     /// ตัวเฝ้า Codex เป็นคนเติมเองก่อนยิงเข้า `--send`
     public var agent: AgentKind?
+    /// ชื่อ tmux session ของ pane ที่ก่อเหตุการณ์ — `--hook` เติมเองจาก TMUX_PANE
+    /// ของตัวเอง (daemon อยู่คนละสาย หาให้ไม่ได้) nil = ไม่ได้อยู่ใน tmux
+    public var tmux: String?
 
     enum CodingKeys: String, CodingKey {
         case hookEventName = "hook_event_name"
@@ -36,6 +39,7 @@ public struct HookEvent: Codable, Equatable, Sendable {
         case source
         case owner
         case agent
+        case tmux
     }
 
     public init(
@@ -48,7 +52,8 @@ public struct HookEvent: Codable, Equatable, Sendable {
         reason: String? = nil,
         source: String? = nil,
         owner: ProcessHandle? = nil,
-        agent: AgentKind? = nil
+        agent: AgentKind? = nil,
+        tmux: String? = nil
     ) {
         self.hookEventName = hookEventName
         self.sessionId = sessionId
@@ -60,16 +65,23 @@ public struct HookEvent: Codable, Equatable, Sendable {
         self.source = source
         self.owner = owner
         self.agent = agent
+        self.tmux = tmux
     }
 
-    /// ชื่อโปรเจกต์ที่จะแสดงใต้มาสคอต — ชื่อโฟลเดอร์สุดท้ายของ cwd
-    /// ไม่มี cwd ให้ถอยไปใช้ชื่อเอเจนต์ ไม่ใช่ "claude" ตายตัว — ไม่งั้น session ของ
-    /// Codex ที่ไม่มี cwd จะขึ้นว่า claude ซึ่งผิดคน
+    /// ป้ายใต้มาสคอต — "อยู่ tmux ไหน" + "บทบาทอะไร"
+    ///
+    /// ชื่อโฟลเดอร์อย่างเดียวใช้ไม่ได้เมื่อมีหลายทีม เพราะทุกทีมวางโครงเหมือนกัน
+    /// (ดู SessionLabel) ไม่ได้อยู่ใน tmux ก็ถอยไปใช้ชื่อโฟลเดอร์แบบเดิม
     public var project: String {
         let fallback = (agent ?? .claude).rawValue
-        guard let cwd, !cwd.isEmpty else { return fallback }
-        let name = URL(fileURLWithPath: cwd).lastPathComponent
-        return name.isEmpty ? fallback : name
+        let role: String
+        if let cwd, !cwd.isEmpty {
+            let name = SessionLabel.role(fromPath: cwd)
+            role = name.isEmpty ? fallback : name
+        } else {
+            role = fallback
+        }
+        return SessionLabel.compose(session: tmux, role: role)
     }
 }
 

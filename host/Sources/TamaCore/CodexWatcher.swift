@@ -15,11 +15,15 @@ public final class CodexWatcher {
     private let idleTimeout: TimeInterval = 15 * 60
     /// ไฟล์ที่ mtime เก่ากว่านี้ไม่ต้องเปิดเลย ประหยัดการ stat ทั้งโฟลเดอร์
     private let activeWindow: TimeInterval = 30 * 60
+    /// อ่านได้มากสุดต่อไฟล์ต่อรอบ — 256KB ครอบคลุมงานจริงของหนึ่งเทิร์นสบายๆ
+    private let maxBytesPerPoll = 256 * 1024
 
     private struct Tracked {
         var offset: UInt64 = 0
         var sessionId: String
         var cwd: String?
+        /// หาครั้งเดียวตอนรู้ cwd — Codex ไม่มี TMUX_PANE ให้เรา (เราอ่านไฟล์จากนอก pane)
+        var tmux: String?
         var lastSeen: Date
         var announced = false
         var ended = false
@@ -76,8 +80,36 @@ public final class CodexWatcher {
         guard let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: path)) else { return [] }
         defer { try? handle.close() }
 
-        var state = tracked[path] ?? Tracked(sessionId: Self.sessionId(fromPath: path), lastSeen: now)
+        let known = tracked[path]
+        var state = known ?? Tracked(sessionId: Self.sessionId(fromPath: path), lastSeen: now)
         let size = (try? handle.seekToEnd()) ?? 0
+
+        // ครั้งแรกที่เห็นไฟล์ = กระโดดไปท้ายไฟล์ ไม่ใช่อ่านตั้งแต่ต้น
+        //
+        // สองเหตุผล และทั้งคู่เป็นเหตุผลที่ *ต้อง* ทำ ไม่ใช่แค่ควร:
+        // 1. ประวัติที่ผ่านไปแล้วไม่ใช่สิ่งที่เกิดตอนนี้ — การเล่นซ้ำทำให้จอโชว์ว่า
+        //    Codex กำลังรันคำสั่งที่มันรันไปเมื่อสามสัปดาห์ก่อน
+        // 2. ไฟล์ session จริงโตถึงระดับสิบเมกได้ (เจอ 39MB บนเครื่องจริง) การพาร์ส
+        //    ทั้งไฟล์เกิดบนคิวเดียวกับ pulse ของ daemon ทุกอย่างหลังจากนั้นในจังหวะนั้น
+        //    จึงไม่ได้ทำงาน — รวมถึงตัวดึงอากาศและการส่ง snapshot
+        if known == nil {
+            // ยกเว้น `session_meta` ที่บรรทัดแรก — cwd อยู่ในนั้นและมีที่เดียว
+            // ถ้าข้ามไปด้วย session จะไม่มีชื่อโปรเจกต์ไปตลอดอายุของมัน
+            try? handle.seek(toOffset: 0)
+            if let head = try? handle.read(upToCount: 8 * 1024),
+                let nl = head.firstIndex(of: 0x0A),
+                let obj = try? JSONSerialization.jsonObject(with: head[head.startIndex..<nl])
+                    as? [String: Any],
+                obj["type"] as? String == "session_meta",
+                let cwd = (obj["payload"] as? [String: Any])?["cwd"] as? String {
+                state.cwd = cwd
+                state.tmux = TmuxSession.forWorkingDirectory(cwd)
+            }
+            state.offset = size
+            tracked[path] = state
+            return []
+        }
+
         // ไฟล์หดแปลว่าถูกเขียนทับ/หมุน — เริ่มอ่านใหม่ตั้งแต่ต้น ดีกว่าอ่านกลางบรรทัด
         if size < state.offset { state.offset = 0 }
         guard size > state.offset else {
@@ -85,8 +117,10 @@ public final class CodexWatcher {
             return []
         }
 
+        // เพดานต่อรอบ — ทุกอย่างที่นี่เกิดบนคิวเดียวกับ pulse ของ daemon
+        // ตามไม่ทันแล้วค่อยตามต่อรอบหน้าดีกว่าทำให้จอค้างไปทั้งจังหวะ
         try? handle.seek(toOffset: state.offset)
-        guard let chunk = try? handle.readToEnd(), !chunk.isEmpty else {
+        guard let chunk = try? handle.read(upToCount: maxBytesPerPoll), !chunk.isEmpty else {
             tracked[path] = state
             return []
         }
@@ -108,6 +142,7 @@ public final class CodexWatcher {
 
             if obj["type"] as? String == "session_meta", let cwd = payload["cwd"] as? String {
                 state.cwd = cwd
+                state.tmux = TmuxSession.forWorkingDirectory(cwd)
             }
             if !state.announced {
                 events.append(make("SessionStart", state, source: "startup"))
@@ -158,6 +193,6 @@ public final class CodexWatcher {
     private func make(_ name: String, _ s: Tracked, tool: String? = nil,
                       source: String? = nil) -> HookEvent {
         HookEvent(hookEventName: name, sessionId: s.sessionId, cwd: s.cwd,
-                  toolName: tool, source: source, agent: .codex)
+                  toolName: tool, source: source, agent: .codex, tmux: s.tmux)
     }
 }

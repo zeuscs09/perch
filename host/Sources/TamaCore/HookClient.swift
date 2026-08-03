@@ -14,6 +14,8 @@ public enum HookClient {
         // ต้องหาที่นี่เท่านั้น: hook process ยังเป็นลูกของ Claude Code อยู่ตอนนี้
         // พอส่งเข้า socket แล้ว daemon อยู่คนละสายบรรพบุรุษ ไต่กลับไปไม่ได้อีก
         event.owner = ProcessTree.claudeAncestor()
+        // ด้วยเหตุผลเดียวกับ owner: TMUX_PANE เป็นของ pane นี้ ตอนนี้เท่านั้น
+        if event.tmux == nil { event.tmux = TmuxSession.current() }
         guard let line = try? Wire.encoder().encode(event) else { return 0 }
         let ok = SocketClient(path: Paths.socket).send(line)
         if !ok { Log.debug("daemon not running, event dropped") }
