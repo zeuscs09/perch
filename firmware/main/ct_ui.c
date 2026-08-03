@@ -1068,14 +1068,7 @@ void ct_ui_set_snapshot(const ct_snapshot_t *snap)
     apply_link_label();
     lv_label_set_text(s_clock_big, s_snap.clock);
     lv_label_set_text(s_clock_small, s_snap.clock);
-    // อุณหภูมิต่อท้ายวันที่ ไม่ใช่บรรทัดใหม่ — พื้นที่นี้แชร์กับแผงโควตาอยู่แล้ว
-    if (s_snap.has_weather && s_snap.temperature != CT_TEMP_UNKNOWN) {
-        char line[CT_DATE_LEN + 12];
-        snprintf(line, sizeof(line), "%s  %d\u00b0", s_snap.date, s_snap.temperature);
-        lv_label_set_text(s_date, line);
-    } else {
-        lv_label_set_text(s_date, s_snap.date);
-    }
+    lv_label_set_text(s_date, s_snap.date);
     lv_obj_align(s_clock_big, LV_ALIGN_TOP_MID, 0, CT_CARD_TOP + CT_CARD_HEIGHT / 2 - 32);
     lv_obj_align(s_date, LV_ALIGN_TOP_MID, 0, CT_CARD_TOP + CT_CARD_HEIGHT / 2 + 18);
 
@@ -1107,6 +1100,18 @@ static void apply_link_label(void)
         label = s_snap.place[0] ? s_snap.place : "tamaclaude";
     } else if (s_link_wifi && s_link_ip[0]) {
         label = s_link_ip;
+    }
+
+    // อุณหภูมิเกาะไปกับชื่อสถานที่ ไม่ใช่ไปอยู่ใต้นาฬิกาใหญ่
+    //
+    // ใต้นาฬิกาคือพื้นที่เดียวกับแผงโควตา ซึ่งโผล่อยู่เกือบตลอดเวลา อุณหภูมิที่วางไว้
+    // ตรงนั้นจึงแทบไม่มีวันได้เห็น ส่วนแถบบนว่างอยู่แล้วและเห็นตลอด — แถมสถานที่
+    // กับอากาศของที่นั่นเป็นเรื่องเดียวกัน วางคู่กันจึงอ่านเป็นก้อนเดียว
+    if (s_link_ble && s_snap.has_weather && s_snap.temperature != CT_TEMP_UNKNOWN) {
+        static char line[CT_PLACE_LEN + 10];
+        snprintf(line, sizeof(line), "%s  %d\u00b0", label, s_snap.temperature);
+        lv_label_set_text(s_link, line);
+        return;
     }
     lv_label_set_text(s_link, label);
 }
