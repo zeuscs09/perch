@@ -28,7 +28,13 @@ public enum UsageReader {
     ///
     /// ช่องที่ไม่มีข้อมูลถูกส่งเป็น "ไม่รู้" ไม่ใช่ถูกตัดทิ้ง — ตำแหน่งของแต่ละช่องบนจอ
     /// ต้องคงที่ ไม่งั้นแถบของ Codex จะกระโดดไปนั่งที่ของ Claude ตอน Claude ยังไม่มีค่า
-    public static func read(now: Date = Date(), from url: URL = Paths.usageCache) -> [UsageSnap]? {
+    /// `codexRoot` แยกเป็นพารามิเตอร์ด้วยเหตุผลเดียวกับ `url` — ฟังก์ชันนี้ต้องทดสอบได้
+    /// โดยไม่ขึ้นกับสิ่งที่บังเอิญมีอยู่ในเครื่องที่รันเทสต์
+    public static func read(
+        now: Date = Date(),
+        from url: URL = Paths.usageCache,
+        codexRoot: URL = CodexQuota.defaultRoot
+    ) -> [UsageSnap]? {
         var claudeSession = UsageSnap()
         var claudeWeekly = UsageSnap()
         if let text = try? String(contentsOf: url, encoding: .utf8) {
@@ -40,7 +46,7 @@ public enum UsageReader {
         }
 
         var codex = UsageSnap()
-        if let w = CodexQuota.read(now: now) {
+        if let w = CodexQuota.read(now: now, root: codexRoot) {
             codex = UsageSnap(percent: w.percent, remaining: w.remaining)
         }
 

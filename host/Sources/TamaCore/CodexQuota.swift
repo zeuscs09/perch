@@ -20,11 +20,12 @@ public enum CodexQuota {
     /// (ต่างจากฝั่ง Claude ที่ค่าเก่ายังถูกเสมอ เพราะที่นี่เราไม่รู้ว่าผู้ใช้ยังใช้ plan เดิมอยู่ไหม)
     static let maxAge: TimeInterval = 14 * 24 * 3600
 
-    public static func read(
-        now: Date = Date(),
-        root: URL = URL(fileURLWithPath: NSHomeDirectory())
+    public static var defaultRoot: URL {
+        URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent(".codex/sessions", isDirectory: true)
-    ) -> Window? {
+    }
+
+    public static func read(now: Date = Date(), root: URL = defaultRoot) -> Window? {
         guard let path = newestSession(root: root, now: now),
             let limits = lastRateLimits(path: path),
             let primary = limits["primary"] as? [String: Any]

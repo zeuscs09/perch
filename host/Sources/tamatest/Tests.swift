@@ -611,7 +611,10 @@ func runAllTests() {
             .appendingPathComponent("usage-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: url) }
 
-        expect(UsageReader.read(now: t0, from: url) == nil, "a missing file shows no panel")
+        // codexRoot ชี้ไปที่ที่ไม่มีจริง — ไม่งั้นผลเทสต์ขึ้นกับว่าเครื่องที่รันมี Codex ไหม
+        let noCodex = url.appendingPathComponent("no-codex")
+        expect(UsageReader.read(now: t0, from: url, codexRoot: noCodex) == nil,
+               "a missing file shows no panel")
 
         try Data("""
             UTILIZATION=35
@@ -620,8 +623,11 @@ func runAllTests() {
             WEEKLY_RESETS_AT=2023-11-16T07:00:00Z
             TIMESTAMP=1700000000
             """.utf8).write(to: url)
-        let rows = UsageReader.read(now: t0, from: url)
-        equal(rows?.count, 2, "always two rows when there is anything to show")
+        let rows = UsageReader.read(now: t0, from: url, codexRoot: noCodex)
+        // สามช่องเสมอ: [claude 5h, claude weekly, codex] — ช่องที่ไม่มีข้อมูลถูกส่งเป็น
+        // "ไม่รู้" ไม่ใช่ถูกตัดทิ้ง ตำแหน่งของแต่ละช่องบนจอจึงคงที่
+        equal(rows?.count, 3, "always three rows when there is anything to show")
+        expect(rows?[2].isKnown == false, "codex row is unknown when there is no codex data")
         equal(rows?[0].percent, 35, "session percent survives")
         // t0 คือ 2023-11-14T22:13:20Z — เหลือ 1h31m40s ปัดลงเป็น 1h31m
         equal(rows?[0].remaining, 5460, "session countdown in seconds")
