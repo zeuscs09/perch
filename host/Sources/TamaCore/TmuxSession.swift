@@ -33,6 +33,7 @@ public enum TmuxSession {
     /// แต่ฝั่ง daemon อยู่ยาว การจำจึงเป็นสิ่งที่กันไม่ให้มันยิง tmux ทุกจังหวะ
     nonisolated(unsafe) private static var cached: String??
     nonisolated(unsafe) private static var cachedPanes: [Pane]?
+    nonisolated(unsafe) private static var cachedAt: Date?
 
     public struct Pane {
         public var session: String
@@ -55,6 +56,23 @@ public enum TmuxSession {
     public static func allNames() -> [String] {
         var seen = Set<String>()
         return panes().compactMap { seen.insert($0.session).inserted ? $0.session : nil }
+    }
+
+    /// แปลรหัส pane ("%12") -> ชื่อ session ที่ย่อแล้ว
+    ///
+    /// ทางเข้าของฝั่ง daemon: hook ส่งแต่รหัสดิบมาให้เพราะมันอ่านฟรีจาก env ส่วนการแปล
+    /// ต้องเรียก tmux ซึ่ง daemon ทำแทนได้และทำครั้งเดียวใช้ได้กับทุก event ที่ตามมา
+    ///
+    /// `maxAge` ทำให้ผลที่จำไว้หมดอายุ — pane ย้าย session ได้และ session ใหม่เกิดได้
+    /// ตลอดเวลา แต่ไม่ใช่ทุกวินาที 30 วิจึงเป็นความสดที่พอสำหรับป้ายชื่อ โดยจ่ายแค่
+    /// สอง fork ต่อนาที ไม่ว่าจะมี event เข้ามากี่พันครั้งก็ตาม
+    public static func sessionName(forPane pane: String, maxAge: TimeInterval = 30,
+                                   now: Date = Date()) -> String? {
+        guard !pane.isEmpty else { return nil }
+        if let stamp = cachedAt, now.timeIntervalSince(stamp) > maxAge { cachedPanes = nil }
+        if cachedPanes == nil { cachedAt = now }
+        guard let match = panes().first(where: { $0.id == pane }) else { return nil }
+        return SessionLabel.shorten(match.session, among: allNames())
     }
 
     /// ทุกอย่างที่ไฟล์นี้ต้องรู้ มาจากคำสั่งเดียวนี้คำสั่งเดียว

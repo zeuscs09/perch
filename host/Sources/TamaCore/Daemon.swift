@@ -67,8 +67,13 @@ public final class Daemon {
         work.async { [weak self] in
             guard let self else { return }
             do {
-                let event = try JSONDecoder().decode(HookEvent.self, from: line)
+                var event = try JSONDecoder().decode(HookEvent.self, from: line)
                 Log.debug("event \(event.hookEventName) \(event.toolName ?? "")")
+                // hook ส่งรหัส pane ดิบมา ("%12") เพราะการแปลต้อง fork tmux ซึ่งแพงเกินกว่า
+                // จะทำทุกครั้งที่เอเจนต์ใช้เครื่องมือ — ที่นี่แปลครั้งเดียวแล้วจำไว้ 30 วินาที
+                if let pane = event.tmux, pane.hasPrefix("%") {
+                    event.tmux = TmuxSession.sessionName(forPane: pane)
+                }
                 self.store.apply(event, now: Date())
                 self.publish()
             } catch {
