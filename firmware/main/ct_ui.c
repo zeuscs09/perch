@@ -52,6 +52,8 @@ typedef struct {
 
 static ct_snapshot_t s_snap;
 static bool s_connected = false;
+// โหมดกลางคืน — ตัดทุกอย่างเหลือนาฬิกา (ดูเหตุผลใน ct_night.h)
+static bool s_night = false;
 
 // แถบโควตาย่อบน topbar — ตรงกับ tools/gen/screen.py:_topbar
 #define USAGE_TOP_W 34
@@ -355,11 +357,83 @@ static void draw_rain(lv_layer_t *layer, float t)
     }
 }
 
+
+// นาฬิกาตัวใหญ่สำหรับกลางคืน — วาดเองจากสี่เหลี่ยม ไม่ใช้ฟอนต์
+//
+// ฟอนต์ที่ใหญ่ที่สุดที่ LVGL มีมาให้คือ montserrat 48 ซึ่งเล็กเกินไปสำหรับจอที่ทั้งใบ
+// มีแค่นาฬิกา การใส่ฟอนต์ใหญ่กว่านั้นต้องแปลงฟอนต์เองและกินแฟลชถาวรเพื่อหน้าจอเดียว
+//
+// ส่วนตัวเลขเจ็ดขีดวาดจากสี่เหลี่ยมได้ทุกขนาดโดยไม่กินแฟลชเพิ่มเลย — และเข้ากับภาษาภาพ
+// ของทั้งเครื่องซึ่งประกอบจากสี่เหลี่ยมทั้งหมดอยู่แล้ว (มาสคอต ฟ้า แถบ) มันจึงไม่ใช่
+// การประนีประนอม แต่เป็นตัวเลือกที่ตรงกว่าฟอนต์
+#define BC_W 58   // กว้างต่อหลัก
+#define BC_H 104  // สูง
+#define BC_T 14   // ความหนาของขีด
+#define BC_GAP 10
+#define BC_COLON 14
+
+// สีลำตัวมาสคอต ไม่ใช่สีข้อความปกติ
+//
+// สองเหตุผล และข้อหลังสำคัญกว่า: มันคือสีประจำเครื่องนี้ · และสีอุ่นมีองค์ประกอบ
+// สีน้ำเงินน้อยกว่าสีขาวมาก ซึ่งเป็นช่วงคลื่นที่รบกวนการนอนมากที่สุด จอที่อยู่ในห้องนอน
+// จึงควรเป็นสีนี้มากกว่าขาว แม้ความสว่างเท่ากัน
+#define BC_COLOR CT_COL_CLAY
+
+// บิต: 0=บน 1=ขวาบน 2=ขวาล่าง 3=ล่าง 4=ซ้ายล่าง 5=ซ้ายบน 6=กลาง
+static const uint8_t BC_SEG[10] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F};
+
+static void draw_digit(lv_layer_t *layer, int x, int y, int d, uint16_t col)
+{
+    if (d < 0 || d > 9) return;
+    uint8_t m = BC_SEG[d];
+    const int h = BC_T / 2, mid = y + (BC_H - BC_T) / 2;
+    if (m & 0x01) fill_rect(layer, x + h, y, x + BC_W - 1 - h, y + BC_T - 1, col, 0);
+    if (m & 0x40) fill_rect(layer, x + h, mid, x + BC_W - 1 - h, mid + BC_T - 1, col, 0);
+    if (m & 0x08) fill_rect(layer, x + h, y + BC_H - BC_T, x + BC_W - 1 - h, y + BC_H - 1, col, 0);
+    if (m & 0x20) fill_rect(layer, x, y + h, x + BC_T - 1, y + BC_H / 2 - 1, col, 0);
+    if (m & 0x02) fill_rect(layer, x + BC_W - BC_T, y + h, x + BC_W - 1, y + BC_H / 2 - 1, col, 0);
+    if (m & 0x10) fill_rect(layer, x, y + BC_H / 2, x + BC_T - 1, y + BC_H - 1 - h, col, 0);
+    if (m & 0x04) fill_rect(layer, x + BC_W - BC_T, y + BC_H / 2, x + BC_W - 1, y + BC_H - 1 - h,
+                            col, 0);
+}
+
+// วาด "HH:MM" กลางจอ — คืนขอบล่างไว้ให้คนวางบรรทัดวันที่ต่อ
+static int draw_big_clock(lv_layer_t *layer, const char *hhmm)
+{
+    if (!hhmm || !hhmm[0]) return 0;
+    int d[4] = {hhmm[0] - '0', hhmm[1] - '0', hhmm[3] - '0', hhmm[4] - '0'};
+
+    int total = 4 * BC_W + 2 * BC_GAP + 2 * BC_GAP + BC_COLON;
+    int x = (CT_SCREEN_WIDTH - total) / 2;
+    // กลางของพื้นที่ใต้แถบบน แล้วยกขึ้นเล็กน้อยเผื่อบรรทัดวันที่ข้างล่าง
+    int y = CT_TOPBAR_HEIGHT + (CT_SCREEN_HEIGHT - CT_TOPBAR_HEIGHT - BC_H) / 2 - 12;
+
+    draw_digit(layer, x, y, d[0], BC_COLOR);
+    x += BC_W + BC_GAP;
+    draw_digit(layer, x, y, d[1], BC_COLOR);
+    x += BC_W + BC_GAP;
+    // จุดคู่ — สี่เหลี่ยมจัตุรัสสองอันที่หนึ่งในสามและสองในสามของความสูง
+    int cy1 = y + BC_H / 3 - BC_T / 2, cy2 = y + 2 * BC_H / 3 - BC_T / 2;
+    fill_rect(layer, x, cy1, x + BC_COLON - 1, cy1 + BC_T - 1, BC_COLOR, 0);
+    fill_rect(layer, x, cy2, x + BC_COLON - 1, cy2 + BC_T - 1, BC_COLOR, 0);
+    x += BC_COLON + BC_GAP;
+    draw_digit(layer, x, y, d[2], BC_COLOR);
+    x += BC_W + BC_GAP;
+    draw_digit(layer, x, y, d[3], BC_COLOR);
+    return y + BC_H;
+}
+
 static void sky_draw_cb(lv_event_t *e)
 {
+    lv_layer_t *layer = lv_event_get_layer(e);
+    // กลางคืน: ผืนนี้เป็นของนาฬิกาทั้งหมด — ใช้ object เดิมเพราะมันกินพื้นที่ใต้แถบบน
+    // พอดีอยู่แล้ว และมีวงจรวาดใหม่ของตัวเองที่ถูกต้องอยู่แล้ว
+    if (s_night) {
+        draw_big_clock(layer, s_snap.clock);
+        return;
+    }
     if (s_sky_phase == CT_SKY_NONE) return;  // ไม่มีฉาก = ปล่อยให้เป็นพื้นจอเปล่า
 
-    lv_layer_t *layer = lv_event_get_layer(e);
     ct_sky_phase_t phase = s_sky_phase;
     float t = (float)s_cycle + s_phase;
     bool covered = weather_is_covered();
@@ -556,8 +630,26 @@ static void invalidate_sky_band(void)
 // ต้องวาดใหม่ทั้งผืนตอนช่วงเปลี่ยน เพราะพื้นดินกับหญ้าเปลี่ยนสีด้วย
 static void update_sky(void)
 {
+    // กลางคืนผืนนี้เป็นนาฬิกา ไม่ใช่ฉาก — วงจรวาดใหม่ตามเฟสจึงไม่มีอะไรให้จับ
+    // ต้องสั่งวาดเองตอนตัวเลขเปลี่ยน และ *เฉพาะ* ตอนนั้น: วาดทุกวินาทีคือการวาดใหม่
+    // ทั้งผืน 320x218 หกสิบครั้งต่อนาทีเพื่อภาพที่เปลี่ยนครั้งเดียว
+    if (s_night) {
+        static char drawn[8];
+        s_sky_phase = CT_SKY_NONE;
+        if (strncmp(drawn, s_snap.clock, sizeof(drawn) - 1) != 0) {
+            snprintf(drawn, sizeof(drawn), "%s", s_snap.clock);
+            lv_obj_invalidate(s_sky);
+        }
+        return;
+    }
+
     ct_sky_phase_t was = s_sky_phase;
-    float hours = s_connected ? ct_clock_hours(s_snap.clock) : -1.0f;
+    // กลางคืนใช้ทางเดียวกับตอนหลุดลิงก์: ไม่มีเฟส = ไม่วาดฉากเลย
+    //
+    // ท้องฟ้ากับสนามหญ้ากินพื้นที่เกือบทั้งจอ มันคือแหล่งกำเนิดแสงที่ใหญ่ที่สุดของ
+    // อุปกรณ์นี้ ต่อให้เป็นฟ้ากลางคืนที่สีเข้มแล้วก็ตาม — การหรี่ไฟหลังอย่างเดียว
+    // ไม่ได้ลบพิกเซลที่ติดอยู่ออกไป
+    float hours = (s_connected && !s_night) ? ct_clock_hours(s_snap.clock) : -1.0f;
     s_sky_hours = hours;
     s_sky_phase = hours < 0.0f ? CT_SKY_NONE : sky_phase_at(hours);
     if (s_sky_phase != was) {
@@ -842,8 +934,10 @@ void ct_ui_init(void)
 // --- ปรับหน้าจอตาม snapshot ---------------------------------------------------
 static void layout_slots(void)
 {
-    int n = s_snap.session_count;
-    if (n == 0) {
+    // กลางคืนไม่มีตัวละครบนจอเลย ทั้งมาสคอตประจำ session และตัวที่เดินเล่นตอนว่าง —
+    // สามตัวนี้เป็นพื้นที่สว่างก้อนใหญ่ที่สุดบนจอ และเป็นสิ่งที่ขยับตลอดเวลาด้วย
+    int n = s_night ? 0 : s_snap.session_count;
+    if (n == 0 && !s_night) {
         lv_obj_remove_flag(s_stroll, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(s_stroll, LV_OBJ_FLAG_HIDDEN);
@@ -880,6 +974,7 @@ static uint16_t card_accent(ct_card_kind_t kind)
 // นับถอยหลังของการขอดูโควตา — ศูนย์คือกลับไปให้การ์ดครองพื้นที่ตามเดิม
 static int s_peek_ms = 0;
 
+
 // ทั้งการ์ดและโควตามาจาก host ทั้งคู่ ลิงก์หลุดแล้วไม่มีใครรับรองว่ายังจริง — พื้นที่ล่าง
 // จึงว่างทั้งแถบและตกเป็นของนาฬิกา ตรงกับ Screen.shown_{cards,usage}() ใน gen/screen.py
 static int shown_card_count(void)
@@ -888,11 +983,15 @@ static int shown_card_count(void)
     // และการ์ดชนะเสมอเพราะมันคือสิ่งที่ต้องการการกระทำ แต่ "ต้องการการกระทำ" กับ
     // "ผู้ใช้กำลังเอานิ้วจิ้มถามอยู่เดี๋ยวนี้" อันหลังชนะ
     if (s_peek_ms > 0) return 0;
+    // กลางคืนไม่มีการ์ด — คนที่นอนอยู่ในห้องไม่ได้จะลุกไปแก้อะไร การเตือนจึงไม่ได้
+    // ช่วยใคร มีแต่ปลุกให้ตื่น (เรื่องที่ค้างยังอยู่ครบ รอให้แตะดูตอนเช้า)
+    if (s_night) return 0;
     return s_connected ? s_snap.card_count : 0;
 }
 
 static bool usage_shown(void)
 {
+    if (s_night) return false;
     return s_snap.has_usage && s_connected;
 }
 
@@ -933,6 +1032,11 @@ static void layout_cards(void)
         lv_obj_add_flag(s_clock_big, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_date, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(s_clock_small, LV_OBJ_FLAG_HIDDEN);
+    } else if (s_night) {
+        // กลางคืนวาดตัวเลขเองใน sky_draw_cb — ป้ายตัวเดิมต้องหลบ ไม่งั้นซ้อนกันสองชั้น
+        lv_obj_add_flag(s_clock_big, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(s_clock_small, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(s_date, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_remove_flag(s_clock_big, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(s_date, LV_OBJ_FLAG_HIDDEN);
@@ -1184,6 +1288,10 @@ static void layout_usage(void)
     }
 }
 
+// ประกาศล่วงหน้า — นาฬิกาใหญ่ถูกจัดตำแหน่งทั้งตอน snapshot มาถึงและตอนสลับโหมด
+// กลางคืน แต่ตัวจริงต้องอยู่ใกล้ ct_ui_set_night ซึ่งเป็นเจ้าของสถานะโหมด
+static void place_idle_clock(void);
+
 // ประกาศล่วงหน้า — ป้ายลิงก์ถูกวาดใหม่ทั้งตอนลิงก์เปลี่ยนและตอน snapshot มาถึง
 // แต่ตัวจริงต้องอยู่ใต้ ct_ui_set_link ซึ่งเป็นเจ้าของสถานะลิงก์
 static void apply_link_label(void);
@@ -1196,8 +1304,7 @@ void ct_ui_set_snapshot(const ct_snapshot_t *snap)
     lv_label_set_text(s_clock_big, s_snap.clock);
     lv_label_set_text(s_clock_small, s_snap.clock);
     lv_label_set_text(s_date, s_snap.date);
-    lv_obj_align(s_clock_big, LV_ALIGN_TOP_MID, 0, CT_CARD_TOP + CT_CARD_HEIGHT / 2 - 32);
-    lv_obj_align(s_date, LV_ALIGN_TOP_MID, 0, CT_CARD_TOP + CT_CARD_HEIGHT / 2 + 18);
+    place_idle_clock();
 
     if (s_snap.overflow > 0) {
         lv_label_set_text_fmt(s_overflow, "+%d", s_snap.overflow);
@@ -1306,6 +1413,41 @@ void ct_ui_set_connected(bool connected)
     layout_usage_topbar();
     for (int i = 0; i < CT_SLOTS_COUNT; i++) lv_obj_invalidate(s_slots[i].canvas);
     lv_obj_invalidate(s_stroll);
+}
+
+// นาฬิกาใหญ่อยู่คนละที่ในสองโหมด
+//
+// ตอนกลางวันมันเป็นผู้เช่าชั่วคราวของพื้นที่ที่การ์ดกับแผงโควตาจะมายึดคืนเมื่อไรก็ได้
+// จึงต้องนั่งตรงกลาง *ของพื้นที่นั้น* ไม่ใช่ของจอ ไม่งั้นพอการ์ดโผล่มามันจะทับกัน
+//
+// ตอนกลางคืนไม่มีใครมาแย่ง ทั้งจอเป็นของมัน — การยังนั่งค่อนล่างเหมือนเดิมจึงอ่านเป็น
+// "วางผิดที่" ไม่ใช่ "เว้นที่ไว้ให้คนอื่น" เพราะไม่มีคนอื่นให้เห็นแล้ว
+static void place_idle_clock(void)
+{
+    if (s_night) {
+        int bottom = CT_TOPBAR_HEIGHT + (CT_SCREEN_HEIGHT - CT_TOPBAR_HEIGHT - BC_H) / 2 - 12
+                     + BC_H;
+        lv_obj_align(s_date, LV_ALIGN_TOP_MID, 0, bottom + 12);
+        return;
+    }
+    lv_obj_align(s_clock_big, LV_ALIGN_TOP_MID, 0, CT_CARD_TOP + CT_CARD_HEIGHT / 2 - 32);
+    lv_obj_align(s_date, LV_ALIGN_TOP_MID, 0, CT_CARD_TOP + CT_CARD_HEIGHT / 2 + 18);
+}
+
+void ct_ui_set_night(bool on)
+{
+    if (on == s_night) return;
+    s_night = on;
+    place_idle_clock();
+    update_sky();  // ผืนใหญ่สลับหน้าที่ระหว่างฉากกับนาฬิกา ต้องวาดใหม่ทันที
+    // เข้าหรือออกโหมดนี้เปลี่ยนทุกอย่างที่แย่งพื้นที่กัน จึงต้องจัดใหม่ทั้งชุด
+    // ไม่ใช่ซ่อนทีละชิ้น — นาฬิกาใหญ่โผล่เองเมื่อไม่มีใครยึดพื้นที่ล่าง ซึ่งเป็นทางเดียว
+    // กับตอนไม่มี session ที่มีอยู่แล้ว
+    layout_slots();
+    layout_cards();
+    layout_usage();
+    layout_machine();
+    layout_usage_topbar();
 }
 
 void ct_ui_peek_usage(void)

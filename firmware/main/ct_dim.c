@@ -22,9 +22,17 @@
 // การไล่ลงช้าๆ อ่านเป็น "มันกำลังพัก" ซึ่งตรงกับสิ่งที่เกิดขึ้นจริง
 #define FADE_MS 800
 
+// ความสว่างกลางคืน — ต่ำกว่าการหรี่ปกติมาก เพราะโจทย์คนละข้อ
+//
+// การหรี่ปกติแก้เรื่อง "ไม่มีใครดูอยู่" ซึ่งยังต้องอ่านออกถ้ามีคนเหลือบมา
+// กลางคืนแก้เรื่อง "มีคนนอนอยู่ในห้องนี้" ซึ่งต้องไม่เป็นแหล่งกำเนิดแสงเลย
+// 15% ในห้องมืดสนิทยังแยงตา — ตัวเลขนี้มาจากการที่ห้องมืดทำให้ตาไวขึ้นมาก
+#define NIGHT_PCT 2
+
 static int s_user = 100;      // เพดานที่ผู้ใช้ตั้ง
 static int s_shown = 100;     // ค่าที่ส่งให้ไฟหลังไปแล้ว
 static int s_idle_ms = 0;
+static bool s_night = false;
 
 static int dim_level(void)
 {
@@ -66,8 +74,35 @@ void ct_dim_wake(void)
     apply(s_user);  // ทันที ไม่ไล่ขึ้น — คนที่เพิ่งแตะจอกำลังรอดูอยู่
 }
 
+// ไล่ความสว่างลงหาเป้าหมายตามเวลาจริง ไม่ใช่ทีละขั้นต่อรอบ — จังหวะของลูปหลัก
+// เปลี่ยนได้ตามงานที่ค้าง ถ้าผูกกับจำนวนรอบ ความเร็วการหรี่จะเปลี่ยนตามว่าบอร์ดยุ่งแค่ไหน
+static void fade_to(int target, int elapsed_ms)
+{
+    if (s_shown <= target) return;
+    int span = s_user - target;
+    if (span <= 0) return;
+    int step = span * elapsed_ms / FADE_MS;
+    if (step < 1) step = 1;
+    int next = s_shown - step;
+    if (next < target) next = target;
+    apply(next);
+}
+
+void ct_dim_set_night(bool on)
+{
+    if (on == s_night) return;
+    s_night = on;
+    if (!on) ct_dim_wake();  // เช้าแล้ว สว่างกลับทันที ไม่ต้องรอให้ใครมาแตะ
+}
+
 void ct_dim_tick(int elapsed_ms)
 {
+    // กลางคืนไม่ต้องรอให้เห็นการแตะก่อน ต่างจากการหรี่ปกติ เพราะมันมีทางออกที่ไม่ขึ้นกับ
+    // ฮาร์ดแวร์อยู่แล้ว: เจ็ดโมงเช้าจอสว่างกลับเอง ต่อให้แตะไม่ติดเลยก็ไม่มีวันค้างมืด
+    if (s_night) {
+        fade_to(NIGHT_PCT, elapsed_ms);
+        return;
+    }
     // อย่าดับสิ่งที่ตัวเองเปิดคืนไม่ได้ — จนกว่าจะเห็นการแตะติดสักครั้ง จอสว่างเต็มไว้ก่อน
     if (!ct_touch_seen()) {
         apply(s_user);
@@ -81,17 +116,5 @@ void ct_dim_tick(int elapsed_ms)
         }
         // เพิ่งข้ามเส้น — เริ่มไล่ลงจากค่าปัจจุบัน
     }
-
-    int target = dim_level();
-    if (s_shown <= target) return;
-
-    // ไล่ลงตามเวลาจริง ไม่ใช่ทีละขั้นต่อรอบ — จังหวะของลูปหลักเปลี่ยนได้ตามงานที่ค้าง
-    // ถ้าผูกกับจำนวนรอบ ความเร็วการหรี่จะเปลี่ยนไปตามว่าบอร์ดกำลังยุ่งแค่ไหน
-    int span = s_user - target;
-    if (span <= 0) return;
-    int step = span * elapsed_ms / FADE_MS;
-    if (step < 1) step = 1;
-    int next = s_shown - step;
-    if (next < target) next = target;
-    apply(next);
+    fade_to(dim_level(), elapsed_ms);
 }

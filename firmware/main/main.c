@@ -10,6 +10,7 @@
 #include "ct_lcd.h"
 #include "ct_dim.h"
 #include "ct_led.h"
+#include "ct_night.h"
 #include "ct_touch.h"
 #include "ct_mascot.h"
 #include "ct_model.h"
@@ -233,6 +234,9 @@ static void apply_pending(void)
         ct_ui_set_link(link, wifi, ip);
     }
     if (got_snapshot) {
+        // เวลาบนบอร์ดมาจาก snapshot ที่เดียว — บอร์ดไม่มีนาฬิกาจริงของตัวเอง
+        // ต้องตั้งก่อนเรียกอย่างอื่น เพราะโหมดกลางคืนตัดสินจากมัน
+        ct_night_set_clock(snap.clock);
         // ไฟอ่านสถานะรวมจาก snapshot เดียวกับที่จอวาด — ไม่ใช่แค่กะพริบตอนมีการเตือนใหม่
         // เพราะคำถามที่ไฟตอบคือ "ตอนนี้ต้องลุกไปทำอะไรไหม" ซึ่งเป็นสภาพต่อเนื่อง
         // ไม่ใช่เหตุการณ์ที่เกิดแล้วผ่านไป
@@ -240,6 +244,18 @@ static void apply_pending(void)
         ct_ui_set_snapshot(&snap);
     }
     if (backlight >= 0) ct_dim_set_user(backlight);
+}
+
+// กระจายสถานะกลางคืนไปให้ทุกคนที่ต้องรู้ — เรียกทุกรอบ แต่ละตัวกันซ้ำเอง
+//
+// อยู่ตรงนี้ไม่ใช่ใน ct_night เพราะ ct_night ตอบคำถามเดียวคือ "ตอนนี้กลางคืนไหม"
+// ส่วนใครต้องทำอะไรกับคำตอบนั้นเป็นเรื่องของการต่อสาย ซึ่งเป็นงานของไฟล์นี้
+static void apply_night(void)
+{
+    bool night = ct_night_active();
+    ct_ui_set_night(night);
+    ct_led_set_night(night);
+    ct_dim_set_night(night);
 }
 
 void app_main(void)
@@ -301,11 +317,14 @@ void app_main(void)
         // อ่านการแตะทุกรอบ ไม่ใช่ทุกเฟรม — นิ้วที่แตะแล้วยกภายในเฟรมเดียวจะหายไป
         // ถ้ารอถึงจังหวะวาด และการอ่านขาหนึ่งขาถูกกว่าการวาดจอมาก
         if (ct_touch_tapped(step_ms)) {
-            // นิ้วเดียวตอบสองอย่างที่คนที่เดินมาถึงโต๊ะอยากได้พร้อมกัน:
-            // เห็นจอชัด และเห็นว่าโควตาเหลือเท่าไร
+            // นิ้วเดียวตอบทุกอย่างที่คนที่เพิ่งเดินมาถึงอยากได้พร้อมกัน:
+            // เห็นจอชัด ออกจากโหมดกลางคืน และเห็นว่าโควตาเหลือเท่าไร
+            ct_night_wake();
             ct_dim_wake();
             ct_ui_peek_usage();
         }
+        ct_night_tick(step_ms);
+        apply_night();
         ct_dim_tick(step_ms);
         since_frame += step_ms;
         if (since_frame >= 60) {  // ~16 เฟรมต่อวินาที พอสำหรับอนิเมชันบล็อกสี่เหลี่ยม

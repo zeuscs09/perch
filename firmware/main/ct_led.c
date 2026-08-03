@@ -55,6 +55,7 @@ typedef enum {
 } led_mode_t;
 
 static led_mode_t s_mode = MODE_OFF;
+static bool s_night = false;
 static rgb_t s_color;
 static float s_phase;     // 0..1 ในหนึ่งรอบ
 static float s_period_s;  // ความยาวหนึ่งรอบ
@@ -149,8 +150,21 @@ static int state_rank(ct_state_t s)
     }
 }
 
+void ct_led_set_night(bool on)
+{
+    if (on == s_night) return;
+    s_night = on;
+    if (on) {
+        s_mode = MODE_OFF;
+        write_rgb(0, 0, 0);
+    }
+    // ออกจากกลางคืนไม่ต้องทำอะไร — snapshot ถัดไปจะสั่งสีที่ถูกต้องมาเองภายในหนึ่งวินาที
+}
+
 void ct_led_apply(const ct_snapshot_t *snap, bool connected)
 {
+    if (s_night) return;  // กลางคืนดับสนิท ไม่ว่าจะมีเรื่องอะไรค้างอยู่
+
     int best = -1, best_rank = -1;
     if (connected) {
         for (int i = 0; i < snap->session_count; i++) {

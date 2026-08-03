@@ -14,6 +14,7 @@ idf_component_register(
         "ct_led.c"
         "ct_touch.c"
         "ct_dim.c"
+        "ct_night.c"
     INCLUDE_DIRS "."
     REQUIRES driver esp_timer nvs_flash bt json esp_wifi esp_netif esp_event
              lwip mbedtls espressif__mdns
