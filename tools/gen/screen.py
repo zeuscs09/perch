@@ -93,6 +93,13 @@ class Screen:
     ble: bool | None = None
     # ที่อยู่บอร์ดบน LAN — ขึ้นแทนชื่อบนแถบเมื่อเหลือแต่ WiFi ซึ่งเป็นตอนเดียวที่ต้องใช้
     ip: str = ""
+    # ชื่อสถานที่ + อุณหภูมิบนแถบบน — "" / None = ไม่ได้ตั้ง ใช้ชื่อบอร์ดตามเดิม
+    place: str = ""
+    temperature: int | None = None
+    # สภาพอากาศ: clear / cloudy / rain / storm / fog — อีกแกนของท้องฟ้า คนละแกนกับเวลา
+    weather: str = "clear"
+    # ภาระเครื่อง (cpu%, mem%) — ช่องที่ 4 ของตาราง วาดคนละแบบกับโควตา
+    machine: tuple[int, int] | None = None
 
     @property
     def ble_link(self) -> bool:
@@ -148,18 +155,27 @@ def _link_icon(draw: ImageDraw.ImageDraw, s: Screen) -> None:
                        fill=quantize565(col))
 
 
+def _link_label(s: Screen) -> str:
+    """ป้ายข้างไอคอน — ตรงกับ apply_link_label ใน firmware/main/ct_ui.c
+
+    ชื่อสถานที่ชนะชื่อบอร์ด: ตอนต่อติดแล้ว "ต่อกับอะไรอยู่" ไม่ใช่คำถามอีกต่อไป
+    (ไอคอนข้างๆ ตอบให้แล้ว) พื้นที่ตรงนี้จึงมีค่ากว่าถ้าบอกอย่างอื่น
+    """
+    if not s.ble_link:
+        return s.ip if (s.wifi and s.ip) else "no link"
+    label = s.place or "tamaclaude"
+    if s.temperature is not None:
+        return f"{label}  {s.temperature}\u00b0"
+    return label
+
+
 def _topbar(draw: ImageDraw.ImageDraw, s: Screen) -> None:
     h = L.topbar.height
     draw.rectangle([0, 0, L.screen.width - 1, h - 1], fill=quantize565(PAL.bg_slot))
     dot = PAL.good if s.connected else PAL.gray
     draw.rectangle([6, h // 2 - 3, 11, h // 2 + 2], fill=quantize565(dot))
     # ป้ายบอกทาง ส่วนสีบอกว่าข้อมูลสดไหม — สองคำถามคนละอัน (ต้องตรงกับ ct_ui_set_link)
-    if s.ble_link:
-        label = "tamaclaude"
-    elif s.wifi and s.ip:
-        label = s.ip
-    else:
-        label = "no link"
+    label = _link_label(s)
     draw.text((17, h // 2), label, font=font(11),
               fill=quantize565(PAL.text if s.connected else PAL.text_dim), anchor="lm")
     _link_icon(draw, s)
@@ -381,13 +397,22 @@ def usage_bar_color(u: Usage) -> str:
     return usage_color(u.pct)
 
 
+# ขอบซ้าย/ขวาของแผง และขนาดของหนึ่งช่องในตาราง
+# ต้องตรงกับ USAGE_X0/USAGE_CELL_W/USAGE_PILL_W ใน firmware/main/ct_ui.c
+USAGE_X0 = L.card.pad + 8
+USAGE_X1 = L.screen.width - L.card.pad - 8
+USAGE_W = USAGE_X1 - USAGE_X0
+USAGE_CELL_W = (USAGE_W - (L.usage.cols - 1) * L.usage.gutter) // L.usage.cols
+# pill แคบลงจาก 62 เพราะช่องแคบลงครึ่งหนึ่ง — ยังพอใส่ "Current" ที่ฟอนต์ 11
+USAGE_PILL_W = 50
+
 # สี pill แยกตามหน้าต่าง — สีคือสิ่งที่บอกว่ากำลังอ่านแถวไหนก่อนอ่านตัวอักษร
-_PILL_COLORS = {"Current": PAL.clay, "Weekly": PAL.good}
+_PILL_COLORS = {"Current": PAL.clay, "Weekly": PAL.good, "Codex": PAL.codex}
 
 
-def _usage_row(draw: ImageDraw.ImageDraw, u: Usage, y: int) -> None:
-    pad, w = L.card.pad, L.screen.width
-    x0, x1 = pad + 8, w - pad - 8
+def _usage_row(draw: ImageDraw.ImageDraw, u: Usage, y: int, x0: int, x1: int) -> None:
+    """หนึ่งช่องของตาราง — ผู้เรียกเป็นคนบอกขอบซ้าย/ขวา ไม่ใช่กินเต็มจอ
+    ต้องตรงกับ build_usage/layout_usage ใน firmware/main/ct_ui.c"""
     col = usage_bar_color(u)
 
     # เปอร์เซ็นต์ตัวใหญ่ — สิ่งเดียวที่ต้องอ่านออกจากอีกฝั่งห้อง
@@ -401,18 +426,18 @@ def _usage_row(draw: ImageDraw.ImageDraw, u: Usage, y: int) -> None:
     # เวลารีเซ็ตอยู่บรรทัดเดียวกับเลข % ไม่ใช่ชั้นใต้แถบ — เกาะขอบขวาของเลขจริง
     # ไม่ใช่พิกัดตายตัวที่กันที่ไว้ให้ "100%" ซึ่งทำให้เลขสองหลักดูห่างจนไม่เป็นก้อนเดียวกัน
     # "resetting" / "no data" ยืนลำพัง — เติม "Resets in" ข้างหน้าแล้วอ่านไม่เป็นภาษา
-    left = fmt_remaining(u.remaining)
-    txt = f"Resets in {left}" if u.remaining and u.remaining > 0 else left
+    # ไม่มีคำว่า "Resets in" — ในตาราง 2 คอลัมน์ช่องกว้างครึ่งเดียว ข้อความเต็ม
+    # ล้นไปทับ pill ส่วน pill ก็บอกอยู่แล้วว่าหน้าต่างไหน (ตรงกับ usage_reset_text)
+    txt = fmt_remaining(u.remaining)
     big_w = draw.textlength(big, font=font(24)) + 2  # +2 = stroke_width ทั้งสองข้าง
-    draw.text((x0 + big_w + 12, y + 14), txt, font=font(11),
+    draw.text((x0 + big_w + 5, y + 14), txt, font=font(11),
               fill=quantize565(PAL.text_dim), anchor="lm")
 
     # ป้ายชื่อหน้าต่างชิดขวา — สีคงที่ต่อหน้าต่าง ไม่ตามระดับการใช้
     # ป้ายบอก *ว่านี่คือหน้าต่างไหน* ซึ่งไม่เคยเปลี่ยน การให้มันเปลี่ยนสีตาม %
     # ทำให้แถวทั้งแถวเป็นสีเดียวตอนวิกฤต แล้วสีหยุดเป็นสัญญาณ กลายเป็นพื้นหลัง
     fl = font(11)
-    lw = draw.textlength(u.label, font=fl)
-    px0 = x1 - lw - 14
+    px0 = x1 - USAGE_PILL_W
     draw.rounded_rectangle([px0, y + 5, x1, y + 23], radius=9,
                            fill=quantize565(_PILL_COLORS.get(u.label, PAL.gray_dark)))
     draw.text(((px0 + x1) / 2, y + 14), u.label, font=fl,
@@ -439,13 +464,61 @@ def _usage_row(draw: ImageDraw.ImageDraw, u: Usage, y: int) -> None:
 
 
 def _usage(draw: ImageDraw.ImageDraw, rows: list[Usage]) -> None:
-    # แผงเตี้ยกว่าพื้นที่ที่มี — จัดกลางแนวตั้ง ไม่ชิดบน ไม่งั้นก้นจอโล่งเป็นแถบ
-    # แล้วอ่านเป็น "ของหาย" แทนที่จะเป็นการตัดสินใจ
-    block = 2 * L.usage.row_h + L.usage.gap
-    y = L.card.top + (L.card.height - block) // 2
-    for u in rows[:2]:
-        _usage_row(draw, u, y)
-        y += L.usage.row_h + L.usage.gap
+    """ตาราง 2 คอลัมน์ — ซ้อนลงมา 4 แถวต้องบีบความสูงเหลือ ~21px ซึ่งเลข %
+    ขนาด 24px ใส่ไม่ลง สองคอลัมน์เก็บความสูงแถวเดิมไว้ได้ทั้งหมด
+
+    แผงเตี้ยกว่าพื้นที่ที่มี จึงจัดกลางแนวตั้ง ไม่ชิดบน ไม่งั้นก้นจอโล่งเป็นแถบ
+    แล้วอ่านเป็น "ของหาย" แทนที่จะเป็นการตัดสินใจ
+    ต้องตรงกับ usage_row_y/usage_cell_x ใน firmware/main/ct_ui.c
+    """
+    grid_rows = (L.usage.rows + L.usage.cols - 1) // L.usage.cols
+    block = grid_rows * L.usage.row_h + (grid_rows - 1) * L.usage.gap
+    top = L.card.top + (L.card.height - block) // 2
+    for i, u in enumerate(rows[:L.usage.rows]):
+        y = top + (i // L.usage.cols) * (L.usage.row_h + L.usage.gap)
+        x0 = USAGE_X0 + (i % L.usage.cols) * (USAGE_CELL_W + L.usage.gutter)
+        _usage_row(draw, u, y, x0, x0 + USAGE_CELL_W)
+
+
+# ต้องตรงกับ build_machine/layout_machine ใน firmware/main/ct_ui.c
+MACHINE_LINE_H = 18
+MACHINE_BAR_H = 4
+MACHINE_LABEL_W = 30
+MACHINE_VALUE_W = 34
+
+
+def _machine(draw: ImageDraw.ImageDraw, cpu: int, mem: int) -> None:
+    """ภาระเครื่องในช่องที่ 4 — สองบรรทัดเล็ก ไม่มี pill ไม่มีเวลานับถอยหลัง
+
+    ตั้งใจให้หน้าตาไม่เหมือนแถวโควตา เพราะเป็นค่าคนละชนิด (ไม่มีเส้นตายรีเซ็ต)
+    ถ้าทำให้เหมือนกัน ช่อง "resets in" ที่ว่างเปล่าจะอ่านเป็นข้อมูลขาด ไม่ใช่ดีไซน์
+    """
+    grid_rows = (L.usage.rows + L.usage.cols - 1) // L.usage.cols
+    block = grid_rows * L.usage.row_h + (grid_rows - 1) * L.usage.gap
+    top = L.card.top + (L.card.height - block) // 2
+    y0 = top + (3 // L.usage.cols) * (L.usage.row_h + L.usage.gap)
+    x0 = USAGE_X0 + (3 % L.usage.cols) * (USAGE_CELL_W + L.usage.gutter)
+    track_w = USAGE_CELL_W - MACHINE_LABEL_W - MACHINE_VALUE_W
+
+    for i, (name, pct) in enumerate((("CPU", cpu), ("RAM", mem))):
+        ly = y0 + i * MACHINE_LINE_H
+        v = min(max(pct, 0), 100)
+        # เกณฑ์สีชุดเดียวกับโควตา — ผู้ใช้เรียนรู้ครั้งเดียวใช้ได้ทั้งจอ
+        col = (PAL.alert if v >= L.usage.crit_pct
+               else PAL.accent if v >= L.usage.warn_pct else PAL.good)
+        draw.text((x0, ly + 7), name, font=font(11),
+                  fill=quantize565(PAL.text_dim), anchor="lm")
+        draw.text((x0 + MACHINE_LABEL_W, ly + 7), f"{v}%", font=font(11),
+                  fill=quantize565(col), anchor="lm")
+        bx = x0 + MACHINE_LABEL_W + MACHINE_VALUE_W
+        by = ly + 5
+        r = MACHINE_BAR_H // 2
+        draw.rounded_rectangle([bx, by, bx + track_w, by + MACHINE_BAR_H - 1],
+                               radius=r, fill=quantize565(PAL.gray_dark))
+        fw = round(track_w * v / 100)
+        if fw > 0:
+            draw.rounded_rectangle([bx, by, bx + fw, by + MACHINE_BAR_H - 1],
+                                   radius=r, fill=quantize565(col))
 
 
 def _idle_clock(draw: ImageDraw.ImageDraw, s: Screen) -> None:
@@ -468,7 +541,7 @@ def render(s: Screen, phase: float = 0.0, cycle: int = 0) -> Image.Image:
     # ฉากอยู่หลังทุกอย่าง กินเต็มจอใต้แถบบน — มาสคอตยืนทับ ยอมให้บังดวงอาทิตย์/ดาว
     # การถูกบังคือระยะลึก ไม่ใช่ของหาย และตอนไม่มี session (ซึ่งเป็นเกือบตลอดเวลา)
     # ฟ้าโล่งทั้งแถบอยู่แล้ว
-    sky.draw(draw, s.clock, s.connected, cycle + phase)
+    sky.draw(draw, s.clock, s.connected, cycle + phase, weather=s.weather)
     _topbar(draw, s)
     n = min(len(s.sessions), L.slots.count)
     if n == 0:
@@ -482,6 +555,9 @@ def render(s: Screen, phase: float = 0.0, cycle: int = 0) -> Image.Image:
         _cards(draw, cards, s.card_overflow or max(0, len(cards) - CARD_MAX))
     elif usage := s.shown_usage():
         _usage(draw, usage)
+        # เซลล์เครื่องอยู่ในตารางเดียวกัน จึงโผล่/หายพร้อมโควตาเสมอ
+        if s.machine:
+            _machine(draw, *s.machine)
     else:
         _idle_clock(draw, s)
     return img

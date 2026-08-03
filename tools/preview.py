@@ -97,9 +97,23 @@ SCENES: dict[str, screen.Screen] = {
         usage=[
             screen.Usage("Current", SESSION_WINDOW, 35, 3 * 3600 + 5 * 60),
             screen.Usage("Weekly", WEEKLY_WINDOW, 48, 31 * 3600),
+            # ช่องที่ 3 ของตาราง — Codex ส่งมาแค่หน้าต่างสัปดาห์หน้าต่างเดียว
+            screen.Usage("Codex", WEEKLY_WINDOW, 41, 5 * 86400),
         ],
+        place="Bangkok",
+        temperature=31,
+        weather="cloudy",
+        machine=(23, 61),
     ),
     # ใกล้เต็มทั้งคู่ + ใช้เร็วกว่าเวลา (ขีด pace อยู่ซ้ายของเนื้อแถบ)
+    # ฝน: พิสูจน์ว่าแกนอากาศทำงาน — ฟ้าหม่น เมฆหนา ดาว/ดวงหาย มีเส้นฝน
+    "weather_rain": screen.Screen(
+        sessions=[screen.Session("berlin", "writing")],
+        clock="14:32",
+        place="Bangkok",
+        temperature=27,
+        weather="rain",
+    ),
     "usage_hot": screen.Screen(
         sessions=[screen.Session("tamaclaude", "building", 0.0)],
         clock="09:41",
@@ -170,7 +184,13 @@ SCENES: dict[str, screen.Screen] = {
         usage=[
             screen.Usage("Current", SESSION_WINDOW, 35, 3 * 3600 + 5 * 60),
             screen.Usage("Weekly", WEEKLY_WINDOW, 48, 31 * 3600),
+            # ช่องที่ 3 ของตาราง — Codex ส่งมาแค่หน้าต่างสัปดาห์หน้าต่างเดียว
+            screen.Usage("Codex", WEEKLY_WINDOW, 41, 5 * 86400),
         ],
+        place="Bangkok",
+        temperature=31,
+        weather="cloudy",
+        machine=(23, 61),
     ),
     "waiting": screen.Screen(
         sessions=[
@@ -199,7 +219,13 @@ def sky_scene(clock: str) -> screen.Screen:
         usage=[
             screen.Usage("Current", SESSION_WINDOW, 35, 3 * 3600 + 5 * 60),
             screen.Usage("Weekly", WEEKLY_WINDOW, 48, 31 * 3600),
+            # ช่องที่ 3 ของตาราง — Codex ส่งมาแค่หน้าต่างสัปดาห์หน้าต่างเดียว
+            screen.Usage("Codex", WEEKLY_WINDOW, 41, 5 * 86400),
         ],
+        place="Bangkok",
+        temperature=31,
+        weather="cloudy",
+        machine=(23, 61),
     )
 
 

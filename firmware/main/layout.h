@@ -29,6 +29,7 @@
 #define CT_USAGE_BAR_H               7
 #define CT_USAGE_COLS                2
 #define CT_USAGE_GUTTER              14
+#define CT_USAGE_ROWS                4
 #define CT_USAGE_SESSION_WINDOW      18000
 #define CT_USAGE_WEEKLY_WINDOW       604800
 #define CT_USAGE_WARN_PCT            60

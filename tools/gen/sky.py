@@ -160,12 +160,26 @@ def _draw_stars(draw: ImageDraw.ImageDraw, phase: str, cycle: int) -> None:
             dot(x, y, PAL.star)
 
 
-def _draw_clouds(draw: ImageDraw.ImageDraw, phase: str, t: float) -> None:
+def _draw_clouds(draw: ImageDraw.ImageDraw, phase: str, t: float,
+                 covered: bool = False) -> None:
+    # กลางคืนปกติไม่มีเมฆ (มองไม่เห็น) แต่ตอนฟ้าปิดต้องเห็น
+    # ไม่งั้นฝนตกลงมาจากฟ้าโล่ง
     if phase == "night":
-        return
-    color = quantize565(CLOUD_COLOR[phase])
+        if not covered:
+            return
+        color = quantize565(PAL.sky_overcast)
+    else:
+        color = quantize565(CLOUD_COLOR[phase])
     pad, span = L.sky.cloud_pad, L.screen.width + 2 * L.sky.cloud_pad
-    for base_x, y, w in L.sky.clouds:
+    clouds = list(L.sky.clouds)
+    if covered:
+        # ก้อนเดิม 3 ก้อนดูโล่งเกินกว่าจะอ่านว่าฟ้าปิด — เติมให้ครบตาม overcast_clouds
+        # หาตำแหน่งจากดัชนีเอง (ตรงกับ draw_clouds ใน ct_ui.c)
+        for i in range(len(L.sky.clouds), L.weather.overcast_clouds):
+            clouds.append([(i * 83 + 29) % L.screen.width,
+                           34 + (i * 17) % 46,
+                           30 + (i * 11) % 26])
+    for base_x, y, w in clouds:
         x = (base_x + t * L.sky.cloud_speed_px_s) % span - pad
         # ปัดเป็นพิกเซลเต็มตรงนี้ ไม่ปล่อยให้ backend ตัดสิน — ฝั่ง LVGL รับ int เท่านั้น
         # ถ้า preview วาดที่ x เศษส่วน ตำแหน่งเมฆจะเลื่อนจากบนบอร์ดได้ถึงหนึ่งพิกเซล
@@ -195,7 +209,54 @@ def _draw_grass(draw_ctx: ImageDraw.ImageDraw, phase: str) -> None:
         draw_ctx.rectangle([x + 3, y - (2 + (side + 1) % 3), x + 4, y], fill=color)
 
 
-def draw(draw_ctx: ImageDraw.ImageDraw, clock: str, connected: bool, t: float) -> None:
+# --- สภาพอากาศ -------------------------------------------------------------
+# อากาศเป็น "อีกแกน" ของท้องฟ้า ไม่ใช่ phase ใหม่: เวลาของวันยังคุมความสว่างพื้นฐาน
+# ส่วนอากาศคุมว่ามีอะไรบังฟ้าอยู่ ต้องตรงกับ weather_* ใน firmware/main/ct_ui.c
+
+WET = ("rain", "storm")
+
+
+def _covered(weather: str) -> bool:
+    """ฟ้าปิดพอที่จะไม่เห็นดวงอาทิตย์/จันทร์และดาว"""
+    return weather != "clear"
+
+
+def _sky_bg(phase: str, weather: str) -> str:
+    """กลางคืนไม่ถูกแทนสี — ฝนตอนตีสองต้องยังมืดกว่าฟ้าโปร่งตอนบ่าย
+    เมฆที่หนาขึ้นเป็นตัวบอกเองว่าปิด"""
+    if weather == "clear" or phase == "night":
+        return SKY_COLOR[phase]
+    return {"cloudy": PAL.sky_overcast, "rain": PAL.sky_overcast,
+            "storm": PAL.sky_storm, "fog": PAL.fog}.get(weather, SKY_COLOR[phase])
+
+
+def _flash_on(weather: str, t: float) -> bool:
+    """ฟ้าแลบ: กะพริบทั้งแผงสั้นๆ แล้วดับ คำนวณจากเวลาล้วน ไม่เก็บสถานะ"""
+    return weather == "storm" and (t % L.weather.flash_every_s) < L.weather.flash_hold_s
+
+
+def _draw_rain(draw_ctx: ImageDraw.ImageDraw, t: float) -> None:
+    """ขีดเฉียงที่วนรอบเอง ไม่ใช่ particle จริง — ตำแหน่งกระจายด้วยตัวคูณเฉพาะกิจ
+    ให้ดูสุ่มแต่คงที่ทุกครั้ง (ภาพนิ่งเวลาหยุดเวลา = ดีบักง่าย)"""
+    span = HORIZON - SKY_TOP
+    if span <= 0:
+        return
+    color = quantize565(PAL.rain)
+    for i in range(L.weather.drops):
+        x0 = (i * 61 + 13) % L.screen.width
+        off = (t * L.weather.drop_speed_px_s + (i * 37 % span)) % span
+        y0 = SKY_TOP + int(off)
+        y1 = min(y0 + L.weather.drop_len, HORIZON - 1)
+        if y1 <= y0:
+            continue
+        mid = (y0 + y1) // 2
+        x1 = x0 + L.weather.drop_slant
+        draw_ctx.rectangle([x0, y0, x0, mid], fill=color)
+        draw_ctx.rectangle([x1, mid, x1, y1], fill=color)
+
+
+def draw(draw_ctx: ImageDraw.ImageDraw, clock: str, connected: bool, t: float,
+         weather: str = "clear") -> None:
     """วาดท้องฟ้า + พื้นดินลงในแถบ slot
 
     `t` = เวลาสัมบูรณ์เป็นวินาทีของฉาก ใช้เฉพาะกับเมฆและการกะพริบ
@@ -211,12 +272,20 @@ def draw(draw_ctx: ImageDraw.ImageDraw, clock: str, connected: bool, t: float) -
         return
     phase = phase_at(h)
     W = L.screen.width
-    draw_ctx.rectangle([0, SKY_TOP, W - 1, HORIZON - 1], fill=quantize565(SKY_COLOR[phase]))
+    covered = _covered(weather)
+    bg = PAL.lightning if _flash_on(weather, t) else _sky_bg(phase, weather)
+    draw_ctx.rectangle([0, SKY_TOP, W - 1, HORIZON - 1], fill=quantize565(bg))
 
-    _draw_stars(draw_ctx, phase, int(t))
-    x, y, color = disc(h)
-    _draw_disc(draw_ctx, x, y, color)
-    _draw_clouds(draw_ctx, phase, t)
+    # ฟ้าปิด = ดาวกับดวงหายไปพร้อมกัน ไม่งั้นอ่านเป็นฟ้าโปร่งสีแปลก
+    if not covered:
+        _draw_stars(draw_ctx, phase, int(t))
+        x, y, color = disc(h)
+        _draw_disc(draw_ctx, x, y, color)
+    # หมอกคือฟ้าที่ไม่มีอะไรเลย — เมฆในหมอกมองไม่เห็นอยู่แล้ว
+    if weather != "fog":
+        _draw_clouds(draw_ctx, phase, t, covered)
+    if weather in WET:
+        _draw_rain(draw_ctx, t)
 
     # พื้นดินวาดทับหลังสุด — ครึ่งล่างของดวงและเมฆที่ต่ำเกินไปจึงถูกตัดที่เส้นขอบฟ้าเอง
     draw_ctx.rectangle([0, HORIZON, W - 1, GROUND_BOTTOM - 1],
