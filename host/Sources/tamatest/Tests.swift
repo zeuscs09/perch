@@ -1916,6 +1916,28 @@ func runAllTests() {
         var cold = FailoverPolicy(grace: 10, since: t0)
         cold.update(ble: false, lan: false, now: t0 + 10)
         expect(cold.wantsLan, "a mac that starts out of range still tries the lan")
+
+        // ลิงก์ที่หลุดๆ ติดๆ ต้องไม่ทำให้ทางสำรองถูกปิดทุกครั้งที่ BLE แวะกลับมา
+        //
+        // วัดจากเครื่องจริงตอนย้ายบอร์ดไปห้องนอน: connected 24 ครั้ง / disconnected 19 ครั้ง
+        // แต่ละช่วงหลุดสั้นกว่า grace ทาง LAN จึงไม่มีวันได้เปิด ทั้งที่ WiFi ต่ออยู่และใช้ได้
+        var flap = FailoverPolicy(grace: 10, flapCount: 3, flapWindow: 180, steady: 300,
+                                  since: t0)
+        flap.update(ble: true, lan: false, now: t0)
+        expect(!flap.wantsLan, "ลิงก์ที่เพิ่งต่อติดยังไม่ใช่ลิงก์ที่มีปัญหา")
+        // หลุด/ติด สลับกันเร็วกว่า grace สามรอบ
+        for i in 0..<3 {
+            flap.update(ble: false, lan: false, now: t0 + Double(i * 4) + 1)
+            flap.update(ble: true, lan: false, now: t0 + Double(i * 4) + 3)
+        }
+        expect(flap.unstable, "หลุดสามครั้งในสามนาทีคือลิงก์ที่ไม่นิ่ง")
+        expect(flap.wantsLan, "และทาง LAN ต้องเปิดค้างไว้แม้ตอน BLE กลับมาแล้ว")
+        equal(flap.route, .ble, "แต่ทางที่ใช้จริงยังเป็น BLE ตราบใดที่มันยังอยู่")
+
+        // ต่อติดยาวพอ = สภาพเปลี่ยนจริง ไม่ใช่ช่วงว่างระหว่างการหลุดสองครั้ง
+        flap.update(ble: true, lan: false, now: t0 + 400)
+        expect(!flap.unstable, "ต่อติดต่อเนื่องห้านาทีคือลิงก์ที่กลับมานิ่งแล้ว")
+        expect(!flap.wantsLan, "และทางสำรองก็ปิดได้")
     }
 
     suite("a child that hangs is killed, not waited on") {
@@ -1955,6 +1977,49 @@ func runAllTests() {
         Thread.sleep(forTimeInterval: 3.4)
         expect(!FileManager.default.fileExists(atPath: marker.path),
                "and the child is dead, not merely abandoned to finish in the background")
+    }
+
+    suite("หน้าต่างที่ตายแล้วต้องไม่ทับหน้าต่างปัจจุบัน") {
+        // วัดจากเครื่องจริง: เปิด 40 session พร้อมกัน ตัวเลขบนแถบเมนูเด้ง 29 -> 14 -> 8 -> 29
+        // ทุกไม่กี่วินาที เพราะ statusline ของทุก session เขียนไฟล์เดียวกันทุก 10 วิ
+        // แต่ละตัวถือ `rate_limits` จาก API response ล่าสุด *ของตัวเอง* ซึ่งค้างได้นาน
+        // เท่าที่ session นั้นเงียบ — คนที่เงียบข้ามรอบหมุนจึงยังถือหน้าต่างที่ตายไปแล้ว
+        let dir = FileManager.default.temporaryDirectory
+        func fresh() -> URL { dir.appendingPathComponent("uw-\(UUID().uuidString)") }
+
+        func payload(_ pct: Int, resets: Int) -> Data {
+            Data(("{\"rate_limits\":{\"five_hour\":{\"used_percentage\":\(pct),"
+                  + "\"resets_at\":\(resets)}}}").utf8)
+        }
+        func field(_ url: URL, _ key: String) -> String? {
+            let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+            for line in text.split(separator: "\n") where line.hasPrefix(key + "=") {
+                return String(line.dropFirst(key.count + 1))
+            }
+            return nil
+        }
+        let old = 1_785_770_400   // หน้าต่างที่หมดอายุแล้ว
+        let now = 1_785_788_400   // หน้าต่างปัจจุบัน (ห้าชั่วโมงถัดไป)
+
+        // หน้าต่างหมุน: เปอร์เซ็นต์ที่ลดลงคือค่าที่ถูก ต้องรับเข้าไป
+        let a = fresh()
+        defer { try? FileManager.default.removeItem(at: a) }
+        UsageWriter.ingest(payload(29, resets: old), to: a)
+        UsageWriter.ingest(payload(8, resets: now), to: a)
+        equal(field(a, "UTILIZATION"), "8", "หน้าต่างใหม่ชนะ แม้เปอร์เซ็นต์จะลดลง")
+        let newReset = field(a, "RESETS_AT")
+
+        // แล้ว session ที่ยังถือหน้าต่างเก่าเขียนตามมา — ต้องไม่ลากค่ากลับไป
+        UsageWriter.ingest(payload(29, resets: old), to: a)
+        equal(field(a, "UTILIZATION"), "8", "หน้าต่างที่ตายแล้วทับหน้าต่างปัจจุบันไม่ได้")
+        equal(field(a, "RESETS_AT"), newReset, "และเวลารีเซ็ตก็ต้องไม่ถอยตามไปด้วย")
+
+        // กฎเดิมยังต้องอยู่: ในหน้าต่างเดียวกัน เปอร์เซ็นต์เพิ่มอย่างเดียว
+        let b = fresh()
+        defer { try? FileManager.default.removeItem(at: b) }
+        UsageWriter.ingest(payload(40, resets: now), to: b)
+        UsageWriter.ingest(payload(12, resets: now), to: b)
+        equal(field(b, "UTILIZATION"), "40", "ในหน้าต่างเดียวกัน ค่าที่ต่ำกว่าคือค่าที่เก่ากว่า")
     }
 
     suite("daemon แปลรหัส pane แทน hook — และยังแปลได้จริง") {

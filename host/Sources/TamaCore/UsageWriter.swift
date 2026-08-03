@@ -149,15 +149,40 @@ public enum UsageWriter {
         var out = incoming
         var fresh = Dictionary(uniqueKeysWithValues: incoming)
 
+        func keep(_ key: String, _ value: String) {
+            fresh[key] = value
+            out = out.map { $0.0 == key ? ($0.0, value) : $0 }
+        }
+
         for (pctKey, resetKey) in [("UTILIZATION", "RESETS_AT"),
                                    ("WEEKLY_UTILIZATION", "WEEKLY_RESETS_AT")] {
+            // หน้าต่างที่ *เก่ากว่า* ที่อยู่ในไฟล์ = ข้อมูลจากคนที่ยังไม่ได้คุยกับ API
+            // ตั้งแต่ก่อนหน้าต่างหมุน
+            //
+            // Claude Code ป้อน `rate_limits` จาก API response ล่าสุด *ของ session นั้น*
+            // ซึ่งค้างอยู่ได้นานเท่าที่ session นั้นเงียบ บนเครื่องที่เปิดหลายสิบ session
+            // พร้อมกัน จึงมีทั้งคนที่ถือหน้าต่างปัจจุบันและคนที่ยังถือหน้าต่างที่ตายไปแล้ว
+            // เขียนไฟล์เดียวกันสลับกันทุกไม่กี่วินาที
+            //
+            // กฎ "เปอร์เซ็นต์เพิ่มอย่างเดียว" ข้างล่างเทียบได้เฉพาะในหน้าต่างเดียวกัน
+            // พอคนละหน้าต่างมันจึงไม่ห้ามอะไรเลย และค่าที่ตายแล้วก็ทับค่าที่ถูกต้องได้
+            // (วัดจากเครื่องจริง: ตัวเลขเด้ง 29 -> 14 -> 8 -> 29 ทุกไม่กี่วินาที)
+            //
+            // `resets_at` เดินหน้าอย่างเดียวเมื่อหน้าต่างหมุน ค่าที่ย้อนหลังจึงเป็นค่าที่เก่า
+            // เสมอ ไม่ว่าเปอร์เซ็นต์จะเป็นเท่าไร — ทิ้งทั้งบาน ไม่ใช่แค่เปอร์เซ็นต์
+            if let oldAt = existing[resetKey].flatMap(parseISO),
+                let newAt = fresh[resetKey].flatMap(parseISO), newAt < oldAt {
+                keep(resetKey, existing[resetKey] ?? "")
+                if let oldPct = existing[pctKey] { keep(pctKey, oldPct) }
+                continue
+            }
+
             guard let oldPct = existing[pctKey].flatMap(Int.init),
                 let newPct = fresh[pctKey].flatMap(Int.init),
                 existing[resetKey] == fresh[resetKey],  // หน้าต่างเดียวกันเท่านั้นที่เทียบได้
                 oldPct > newPct
             else { continue }
-            fresh[pctKey] = String(oldPct)
-            out = out.map { $0.0 == pctKey ? ($0.0, String(oldPct)) : $0 }
+            keep(pctKey, String(oldPct))
         }
 
         // คีย์ที่แหล่งอื่นเขียนไว้แต่เราไม่รู้จัก (เช่น PROFILE_NAME, COST_*) ต้องรอดไป
