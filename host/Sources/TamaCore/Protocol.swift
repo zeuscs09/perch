@@ -19,6 +19,11 @@ public struct HookEvent: Codable, Equatable, Sendable {
     /// ก่อนส่งต่อเข้า socket จึงต้อง optional เสมอ (ทั้งเหตุการณ์ที่มาจาก `--send`
     /// และ hook เก่าที่ยังไม่รู้จักคีย์นี้)
     public var owner: ProcessHandle?
+    /// เอเจนต์ที่ก่อเหตุการณ์นี้
+    ///
+    /// Claude Code ไม่ส่งมา (มันไม่รู้ว่ามีเอเจนต์อื่น) จึงไม่มีคีย์นี้ = claude
+    /// ตัวเฝ้า Codex เป็นคนเติมเองก่อนยิงเข้า `--send`
+    public var agent: AgentKind?
 
     enum CodingKeys: String, CodingKey {
         case hookEventName = "hook_event_name"
@@ -30,6 +35,7 @@ public struct HookEvent: Codable, Equatable, Sendable {
         case reason
         case source
         case owner
+        case agent
     }
 
     public init(
@@ -41,7 +47,8 @@ public struct HookEvent: Codable, Equatable, Sendable {
         prompt: String? = nil,
         reason: String? = nil,
         source: String? = nil,
-        owner: ProcessHandle? = nil
+        owner: ProcessHandle? = nil,
+        agent: AgentKind? = nil
     ) {
         self.hookEventName = hookEventName
         self.sessionId = sessionId
@@ -52,13 +59,17 @@ public struct HookEvent: Codable, Equatable, Sendable {
         self.reason = reason
         self.source = source
         self.owner = owner
+        self.agent = agent
     }
 
     /// ชื่อโปรเจกต์ที่จะแสดงใต้มาสคอต — ชื่อโฟลเดอร์สุดท้ายของ cwd
+    /// ไม่มี cwd ให้ถอยไปใช้ชื่อเอเจนต์ ไม่ใช่ "claude" ตายตัว — ไม่งั้น session ของ
+    /// Codex ที่ไม่มี cwd จะขึ้นว่า claude ซึ่งผิดคน
     public var project: String {
-        guard let cwd, !cwd.isEmpty else { return "claude" }
+        let fallback = (agent ?? .claude).rawValue
+        guard let cwd, !cwd.isEmpty else { return fallback }
         let name = URL(fileURLWithPath: cwd).lastPathComponent
-        return name.isEmpty ? "claude" : name
+        return name.isEmpty ? fallback : name
     }
 }
 
@@ -127,18 +138,56 @@ public struct CardSnap: Codable, Equatable, Sendable {
     }
 }
 
+/// เอเจนต์ที่เป็นเจ้าของ session — คนละแกนกับ `project` (ชื่อโฟลเดอร์)
+///
+/// Claude กับ Codex ทำงานในโฟลเดอร์เดียวกันได้ ชื่อโปรเจกต์จึงแยกไม่ออกว่าใครเป็นใคร
+/// บอร์ดใช้ค่านี้เลือกจานสีของมาสคอต ไม่ได้ใช้เลือกท่า — ท่ายังมาจาก `state` เหมือนเดิม
+public enum AgentKind: String, Codable, Equatable, Sendable, CaseIterable {
+    case claude
+    case codex
+    case antigravity
+
+    /// อักษรเดียวบนสาย — ประหยัดไบต์ในงบ 500 ที่แชร์กับ session และ card
+    public var wire: String { String(rawValue.prefix(1)) }
+
+    public init?(wire: String) {
+        guard let match = Self.allCases.first(where: { $0.wire == wire }) else { return nil }
+        self = match
+    }
+}
+
 public struct SessionSnap: Codable, Equatable, Sendable {
     public var project: String
     public var state: VisualState
+    public var agent: AgentKind
 
     enum CodingKeys: String, CodingKey {
         case project = "p"
         case state = "s"
+        case agent = "a"
     }
 
-    public init(project: String, state: VisualState) {
+    public init(project: String, state: VisualState, agent: AgentKind = .claude) {
         self.project = project
         self.state = state
+        self.agent = agent
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        project = try c.decode(String.self, forKey: .project)
+        state = try c.decode(VisualState.self, forKey: .state)
+        // ไม่มีคีย์ = daemon/บอร์ดรุ่นก่อนมี multi-agent ให้ถือเป็น claude
+        agent = (try? c.decode(String.self, forKey: .agent)).flatMap(AgentKind.init(wire:)) ?? .claude
+    }
+
+    /// ไม่ส่ง `a` เมื่อเป็น claude — เคสที่พบบ่อยที่สุดจึงไม่กินไบต์เพิ่มเลย
+    /// และ snapshot ยังถอดได้ด้วยบอร์ดรุ่นก่อนหน้า
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(project, forKey: .project)
+        try c.encode(state, forKey: .state)
+        if agent != .claude { try c.encode(agent.wire, forKey: .agent) }
     }
 }
 

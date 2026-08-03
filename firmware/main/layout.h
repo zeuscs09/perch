@@ -27,6 +27,8 @@
 #define CT_USAGE_ROW_H               40
 #define CT_USAGE_GAP                 4
 #define CT_USAGE_BAR_H               7
+#define CT_USAGE_COLS                2
+#define CT_USAGE_GUTTER              14
 #define CT_USAGE_SESSION_WINDOW      18000
 #define CT_USAGE_WEEKLY_WINDOW       604800
 #define CT_USAGE_WARN_PCT            60
@@ -112,6 +114,12 @@ static const int16_t ct_sky_grass_x[CT_SKY_GRASS_X_COUNT] = {
 #define CT_COL_STEEL                 0x53B1
 #define CT_COL_ALERT                 0xDAA9
 #define CT_COL_GOOD                  0x5D4B
+#define CT_COL_CODEX                 0x4D58
+#define CT_COL_CODEX_DARK            0x33B1
+#define CT_COL_CODEX_SLEEP           0x2A6B
+#define CT_COL_ANTIGRAV              0x8BFB
+#define CT_COL_ANTIGRAV_DARK         0x62B5
+#define CT_COL_ANTIGRAV_SLEEP        0x41CD
 #define CT_COL_SKY_NIGHT             0x0863
 #define CT_COL_SKY_DAWN              0x3A4F
 #define CT_COL_SKY_DAY               0xBEFE

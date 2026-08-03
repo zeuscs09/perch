@@ -38,6 +38,8 @@ enum Activity: Equatable {
 struct Session {
     var id: String
     var project: String
+    /// เอเจนต์เจ้าของ session — ตั้งครั้งเดียวตอนสร้าง ไม่เปลี่ยนตลอดอายุ session
+    var agent: AgentKind = .claude
     var activity: Activity = .thinking
     var startedAt: Date
     var lastActivity: Date
@@ -140,6 +142,7 @@ public final class SessionStore {
             sessions[id] = Session(
                 id: id,
                 project: Text.fit(e.project, to: Text.Limit.project),
+                agent: e.agent ?? .claude,
                 startedAt: now,
                 lastActivity: now
             )
@@ -306,17 +309,17 @@ public final class SessionStore {
         stopAlerts(now: now)
 
         // เดินท่าของทุกตัวก่อน (รวมตัวที่ตกจอ) เพื่อให้นาฬิกาหน่วงท่าเดินสม่ำเสมอ
-        var live: [(project: String, state: VisualState, lastActivity: Date)] = []
+        var live: [(project: String, agent: AgentKind, state: VisualState, lastActivity: Date)] = []
         for id in order {
             guard var s = sessions[id] else { continue }
             let state = s.displayState(now: now, t: timings)
             sessions[id] = s
-            live.append((s.project, state, s.lastActivity))
+            live.append((s.project, s.agent, state, s.lastActivity))
         }
 
         // เลือกตัวที่ได้ slot ตามความสำคัญ แต่ *วาด* ตามลำดับเกิดเสมอ
         // สิ่งที่ต้องนิ่งคือลำดับซ้าย->ขวา ไม่ใช่พิกัด (DESIGN.md)
-        let chosen: [(project: String, state: VisualState, lastActivity: Date)]
+        let chosen: [(project: String, agent: AgentKind, state: VisualState, lastActivity: Date)]
         if live.count <= slotCount {
             chosen = live
         } else {
@@ -336,7 +339,7 @@ public final class SessionStore {
             chosen = live.enumerated().filter { keep.contains($0.offset) }.map { $0.element }
         }
 
-        let snaps = chosen.map { SessionSnap(project: $0.project, state: $0.state) }
+        let snaps = chosen.map { SessionSnap(project: $0.project, state: $0.state, agent: $0.agent) }
 
         let f = DateFormatter()
         f.calendar = calendar

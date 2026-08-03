@@ -24,9 +24,21 @@ typedef enum {
     CT_CARD_DONE,
 } ct_card_kind_t;
 
+// เอเจนต์เจ้าของ session — คนละแกนกับ state (ท่า) และคนละแกนกับ project (ชื่อโฟลเดอร์)
+//
+// Claude กับ Codex ทำงานในโฟลเดอร์เดียวกันได้ ชื่อโปรเจกต์จึงบอกไม่ได้ว่าใครเป็นใคร
+// ใช้เลือกจานสีลำตัวมาสคอตเท่านั้น ไม่กระทบท่าทางหรือ prop
+typedef enum {
+    CT_AGENT_CLAUDE = 0,
+    CT_AGENT_CODEX,
+    CT_AGENT_ANTIGRAVITY,
+    CT_AGENT_COUNT,
+} ct_agent_t;
+
 typedef struct {
     char project[CT_PROJECT_LEN];
     ct_state_t state;
+    ct_agent_t agent;
 } ct_session_t;
 
 typedef struct {
@@ -40,7 +52,10 @@ typedef struct {
 // -1 แปลว่า "ไม่รู้" ไม่ใช่ศูนย์ — ศูนย์เป็นค่าจริง เปอร์เซ็นต์ที่ไม่รู้ต้องวาดเป็น "--"
 // ห้ามเดาจากอะไรทั้งสิ้น
 #define CT_USAGE_UNKNOWN (-1)
-#define CT_USAGE_ROWS 2
+// สี่ช่อง เรียง 2x2: [Claude 5h, Claude weekly, Codex, สำรอง]
+// ช่องที่ daemon ไม่ส่งค่ามาให้ถูกซ่อน ไม่ใช่ถูกอัดขึ้นมาแทนที่ — ตำแหน่งของแต่ละช่อง
+// ต้องคงที่ ไม่งั้นแถบของ Codex จะย้ายไปนั่งที่ของ Claude ตอน Claude ยังไม่มีค่า
+#define CT_USAGE_ROWS 4
 
 typedef struct {
     int percent;

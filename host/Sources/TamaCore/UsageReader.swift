@@ -17,21 +17,36 @@ public enum UsageReader {
     public static let sessionWindow = 18_000  // 5 ชั่วโมง
     public static let weeklyWindow = 604_800  // 7 วัน
 
-    /// อ่านแล้วแปลงเป็น `[session, weekly]` พร้อมส่งขึ้นบอร์ด
+    /// ความยาวหน้าต่างของแต่ละช่องบนจอ — ช่องของ Codex ยาวไม่คงที่ (ขึ้นกับ plan)
+    /// จึงถูกเติมตอนอ่านจริง ไม่ใช่ค่าคงที่เหมือนสองช่องแรก
+    public static let windows = [sessionWindow, weeklyWindow, weeklyWindow]
+
+    /// อ่านแล้วแปลงเป็น `[claude 5h, claude weekly, codex]` พร้อมส่งขึ้นบอร์ด
     ///
     /// คืน `nil` เมื่อไม่มีอะไรจะบอกเลย (ไฟล์หาย/อ่านไม่ได้/ไม่มีคีย์ที่รู้จักสักตัว)
     /// ซึ่งบอร์ดตีความว่าให้กลับไปเป็นนาฬิกา — โครงเปล่าดูเหมือนอุปกรณ์พัง
+    ///
+    /// ช่องที่ไม่มีข้อมูลถูกส่งเป็น "ไม่รู้" ไม่ใช่ถูกตัดทิ้ง — ตำแหน่งของแต่ละช่องบนจอ
+    /// ต้องคงที่ ไม่งั้นแถบของ Codex จะกระโดดไปนั่งที่ของ Claude ตอน Claude ยังไม่มีค่า
     public static func read(now: Date = Date(), from url: URL = Paths.usageCache) -> [UsageSnap]? {
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-        let fields = parse(text)
+        var claudeSession = UsageSnap()
+        var claudeWeekly = UsageSnap()
+        if let text = try? String(contentsOf: url, encoding: .utf8) {
+            let fields = parse(text)
+            claudeSession = snap(
+                percent: fields["UTILIZATION"], resets: fields["RESETS_AT"], now: now)
+            claudeWeekly = snap(
+                percent: fields["WEEKLY_UTILIZATION"], resets: fields["WEEKLY_RESETS_AT"], now: now)
+        }
 
-        let session = snap(
-            percent: fields["UTILIZATION"], resets: fields["RESETS_AT"], now: now)
-        let weekly = snap(
-            percent: fields["WEEKLY_UTILIZATION"], resets: fields["WEEKLY_RESETS_AT"], now: now)
+        var codex = UsageSnap()
+        if let w = CodexQuota.read(now: now) {
+            codex = UsageSnap(percent: w.percent, remaining: w.remaining)
+        }
 
-        guard session.isKnown || weekly.isKnown else { return nil }
-        return [session, weekly]
+        let rows = [claudeSession, claudeWeekly, codex]
+        guard rows.contains(where: { $0.isKnown }) else { return nil }
+        return rows
     }
 
     /// เวลาในหน้าต่างเดินไปกี่เปอร์เซ็นต์แล้ว — ตำแหน่งของขีด pace

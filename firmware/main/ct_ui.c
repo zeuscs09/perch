@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "ct_agent.h"
 #include "ct_mascot.h"
 #include "ct_rects.h"
 #include "layout.h"
@@ -346,6 +347,8 @@ static void slot_draw_cb(lv_event_t *e)
 
     ct_rects_t rects;
     ct_mascot_build_centered(&rects, state, phase, s_connected, s_cycle + slot->index);
+    // ทาสีตามเอเจนต์หลัง build — ท่าและ prop เหมือนกันทุกเอเจนต์ ต่างแค่สีลำตัว
+    ct_agent_recolor(&rects, s_snap.sessions[slot->index].agent);
     draw_mascot_rects(layer, &rects, ox, oy);
 }
 
@@ -574,38 +577,59 @@ static void build_cards(lv_obj_t *scr)
 #define USAGE_X1 (CT_SCREEN_WIDTH - CT_CARD_PAD - 8)
 #define USAGE_W (USAGE_X1 - USAGE_X0)
 
-static const char *const USAGE_LABELS[CT_USAGE_ROWS] = {"Current", "Weekly"};
+// ป้ายของแต่ละช่อง — สองช่องแรกเป็นของ Claude จึงไม่ต้องเขียนชื่อกำกับ
+// ช่องที่ 4 สำรองไว้ ยังไม่มี daemon ตัวไหนส่งค่ามาให้ (ถูกซ่อนอยู่)
+static const char *const USAGE_LABELS[CT_USAGE_ROWS] = {"Current", "Weekly", "Codex", "—"};
 static const int USAGE_WINDOWS[CT_USAGE_ROWS] = {CT_USAGE_SESSION_WINDOW,
+                                                 CT_USAGE_WEEKLY_WINDOW,
+                                                 CT_USAGE_WEEKLY_WINDOW,
                                                  CT_USAGE_WEEKLY_WINDOW};
-// สี pill แยกตามหน้าต่าง — สีคือสิ่งที่บอกว่ากำลังอ่านแถวไหนก่อนอ่านตัวอักษร
-static const uint16_t USAGE_PILL_COLORS[CT_USAGE_ROWS] = {CT_COL_CLAY, CT_COL_GOOD};
+// สี pill — สองช่องแรกคงสีเดิมของ Claude ช่องของ Codex ใช้สีลำตัวมาสคอตตัวเดียวกัน
+// เพื่อให้แถบกับมาสคอตบนจอเดียวกันอ่านเป็นของเจ้าเดียวกัน
+static const uint16_t USAGE_PILL_COLORS[CT_USAGE_ROWS] = {CT_COL_CLAY, CT_COL_GOOD,
+                                                          CT_COL_CODEX, CT_COL_ANTIGRAV};
 
-// y ของขอบบนแถว i — แผงเตี้ยกว่าพื้นที่ที่มี จึงจัดกลางแนวตั้ง ไม่ชิดบน
+// จำนวนแถวจริงของตาราง — ปัดขึ้นเผื่อช่องสุดท้ายไม่เต็มคอลัมน์
+#define USAGE_GRID_ROWS ((CT_USAGE_ROWS + CT_USAGE_COLS - 1) / CT_USAGE_COLS)
+// ความกว้างของหนึ่งช่อง หลังหักช่องไฟระหว่างคอลัมน์
+#define USAGE_CELL_W ((USAGE_W - (CT_USAGE_COLS - 1) * CT_USAGE_GUTTER) / CT_USAGE_COLS)
+// pill แคบลงจาก 62 เพราะช่องแคบลงครึ่งหนึ่ง — ยังพอใส่ "Current" ที่ฟอนต์ 12
+#define USAGE_PILL_W 54
+
+// ช่อง i เรียงตามแถวก่อน (0,1 = แถวบน / 2,3 = แถวล่าง) — คู่ของ Claude จึงอยู่บรรทัด
+// เดียวกัน ซึ่งเป็นคู่ที่ต้องอ่านเทียบกันบ่อยที่สุด
 // ต้องตรงกับ _usage ใน tools/gen/screen.py
 static int usage_row_y(int i)
 {
-    int block = 2 * CT_USAGE_ROW_H + CT_USAGE_GAP;
-    return CT_CARD_TOP + (CT_CARD_HEIGHT - block) / 2 + i * (CT_USAGE_ROW_H + CT_USAGE_GAP);
+    int block = USAGE_GRID_ROWS * CT_USAGE_ROW_H + (USAGE_GRID_ROWS - 1) * CT_USAGE_GAP;
+    int row = i / CT_USAGE_COLS;
+    return CT_CARD_TOP + (CT_CARD_HEIGHT - block) / 2 + row * (CT_USAGE_ROW_H + CT_USAGE_GAP);
+}
+
+static int usage_cell_x(int i)
+{
+    return USAGE_X0 + (i % CT_USAGE_COLS) * (USAGE_CELL_W + CT_USAGE_GUTTER);
 }
 
 static void build_usage(lv_obj_t *scr)
 {
     for (int i = 0; i < CT_USAGE_ROWS; i++) {
         int y = usage_row_y(i);
+        int x = usage_cell_x(i);
         usage_row_t *u = &s_usage[i];
 
         u->percent_bold = plain_label(scr, &lv_font_montserrat_24, CT_COL_GOOD);
-        lv_obj_set_pos(u->percent_bold, USAGE_X0 + 1, y + 1);
+        lv_obj_set_pos(u->percent_bold, x + 1, y + 1);
         u->percent = plain_label(scr, &lv_font_montserrat_24, CT_COL_GOOD);
-        lv_obj_set_pos(u->percent, USAGE_X0, y);
+        lv_obj_set_pos(u->percent, x, y);
 
         // pill วาดด้วย obj โค้งมุม ไม่ใช่ label ที่มีพื้นหลัง เพราะต้องกำหนดความกว้าง
         // จากความยาวข้อความเองตอน build (ข้อความคงที่ ไม่เปลี่ยนตามข้อมูล)
-        u->pill = plain_obj(scr, 62, 18);
+        u->pill = plain_obj(scr, USAGE_PILL_W, 18);
         lv_obj_set_style_bg_color(u->pill, ct_color(USAGE_PILL_COLORS[i]), 0);
         lv_obj_set_style_bg_opa(u->pill, LV_OPA_COVER, 0);
         lv_obj_set_style_radius(u->pill, 9, 0);
-        lv_obj_set_pos(u->pill, USAGE_X1 - 62, y + 5);
+        lv_obj_set_pos(u->pill, x + USAGE_CELL_W - USAGE_PILL_W, y + 5);
 
         // ตัวอักษรสีหมึกบนพื้น pill สว่าง — สีข้อความเดิมจมกับพื้นส้ม/เขียว
         u->pill_text = plain_label(u->pill, &lv_font_montserrat_12, CT_COL_INK);
@@ -613,13 +637,13 @@ static void build_usage(lv_obj_t *scr)
         lv_obj_center(u->pill_text);
 
         // รางต้องสว่างกว่าพื้นจอพอให้เห็นความยาวเต็มของแถบตอนใช้ไปน้อย
-        u->track = plain_obj(scr, USAGE_W, CT_USAGE_BAR_H);
+        u->track = plain_obj(scr, USAGE_CELL_W, CT_USAGE_BAR_H);
         lv_obj_set_style_bg_color(u->track, ct_color(CT_COL_GRAY_DARK), 0);
         lv_obj_set_style_bg_opa(u->track, LV_OPA_COVER, 0);
         lv_obj_set_style_radius(u->track, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_pos(u->track, USAGE_X0, y + 28);
+        lv_obj_set_pos(u->track, x, y + 28);
 
-        u->fill = plain_obj(u->track, USAGE_W, CT_USAGE_BAR_H);
+        u->fill = plain_obj(u->track, USAGE_CELL_W, CT_USAGE_BAR_H);
         lv_obj_set_style_bg_opa(u->fill, LV_OPA_COVER, 0);
         lv_obj_set_style_radius(u->fill, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_pos(u->fill, 0, 0);
@@ -627,7 +651,7 @@ static void build_usage(lv_obj_t *scr)
         u->pace = plain_obj(scr, 1, CT_USAGE_BAR_H + 4);
         lv_obj_set_style_bg_color(u->pace, ct_color(CT_COL_OUTLINE), 0);
         lv_obj_set_style_bg_opa(u->pace, LV_OPA_COVER, 0);
-        lv_obj_set_pos(u->pace, USAGE_X0, y + 26);
+        lv_obj_set_pos(u->pace, x, y + 26);
 
         // เวลารีเซ็ตอยู่บรรทัดเดียวกับเลข % ไม่ใช่ชั้นใต้แถบ — ประหยัด 16px ต่อแถว
         // โดยไม่ต้องลดขนาดเลข %
@@ -877,6 +901,17 @@ static void layout_usage(void)
             continue;
         }
         const ct_usage_t *u = &s_snap.usage[i];
+        // ไม่มีทั้งเปอร์เซ็นต์และเวลา = daemon ไม่เคยส่งช่องนี้มาเลย (เช่นช่องสำรอง)
+        // ต่างจาก "รู้ว่ามีหน้าต่างแต่ยังไม่รู้ค่า" ซึ่งต้องโชว์ -- ตามดีไซน์เดิม
+        if (u->percent == CT_USAGE_UNKNOWN && u->remaining == CT_USAGE_UNKNOWN) {
+            lv_obj_add_flag(row->percent, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(row->percent_bold, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(row->pill, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(row->track, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(row->pace, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(row->reset, LV_OBJ_FLAG_HIDDEN);
+            continue;
+        }
         uint16_t col = usage_bar_color(u, USAGE_WINDOWS[i]);
 
         lv_obj_remove_flag(row->percent, LV_OBJ_FLAG_HIDDEN);
@@ -899,7 +934,7 @@ static void layout_usage(void)
         int pct = u->percent;
         if (pct < 0) pct = 0;
         if (pct > 100) pct = 100;
-        int w = (USAGE_W * pct + 50) / 100;
+        int w = (USAGE_CELL_W * pct + 50) / 100;
         if (u->percent < 0 || w <= 0) {
             lv_obj_add_flag(row->fill, LV_OBJ_FLAG_HIDDEN);
         } else {
@@ -916,7 +951,9 @@ static void layout_usage(void)
             if (elapsed > USAGE_WINDOWS[i]) elapsed = USAGE_WINDOWS[i];
             int y = usage_row_y(i) + 26;
             lv_obj_set_pos(row->pace,
-                           USAGE_X0 + (int)((int64_t)USAGE_W * elapsed / USAGE_WINDOWS[i]), y);
+                           usage_cell_x(i)
+                               + (int)((int64_t)USAGE_CELL_W * elapsed / USAGE_WINDOWS[i]),
+                           y);
             lv_obj_remove_flag(row->pace, LV_OBJ_FLAG_HIDDEN);
         } else {
             lv_obj_add_flag(row->pace, LV_OBJ_FLAG_HIDDEN);

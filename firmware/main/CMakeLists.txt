@@ -6,6 +6,7 @@ idf_component_register(
         "ct_props.c"
         "ct_mascot.c"
         "ct_model.c"
+        "ct_agent.c"
         "ct_ui.c"
         "ct_ble.c"
         "ct_wifi.c"

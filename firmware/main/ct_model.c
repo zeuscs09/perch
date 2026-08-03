@@ -26,6 +26,16 @@ static ct_state_t state_from_name(const char *name)
     return CT_STATE_IDLE;
 }
 
+// ตัวอักษรเดียวบนสาย ("c"/"x"/"a") — ประหยัดไบต์ในงบ MTU ที่แชร์กับ session และ card
+// ไม่มีคีย์ = daemon รุ่นก่อนมี multi-agent ซึ่งส่งแต่ session ของ Claude
+static ct_agent_t agent_from_name(const char *name)
+{
+    if (!name) return CT_AGENT_CLAUDE;
+    if (name[0] == 'x') return CT_AGENT_CODEX;
+    if (name[0] == 'a') return CT_AGENT_ANTIGRAVITY;
+    return CT_AGENT_CLAUDE;
+}
+
 static ct_card_kind_t kind_from_name(const char *name)
 {
     if (!name) return CT_CARD_INFO;
@@ -81,6 +91,8 @@ bool ct_model_parse(const char *json, int len, ct_snapshot_t *out)
             copy_str(sess->project, sizeof(sess->project), cJSON_GetObjectItem(it, "p"));
             const cJSON *st = cJSON_GetObjectItem(it, "s");
             sess->state = state_from_name(cJSON_IsString(st) ? st->valuestring : NULL);
+            const cJSON *ag = cJSON_GetObjectItem(it, "a");
+            sess->agent = agent_from_name(cJSON_IsString(ag) ? ag->valuestring : NULL);
         }
     }
 

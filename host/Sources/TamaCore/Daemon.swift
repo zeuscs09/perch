@@ -10,6 +10,11 @@ public final class Daemon {
     private var transports: [Transport]
     private var timer: DispatchSourceTimer?
     private var lastSent: Data?
+    /// Codex ไม่มี hook ให้ติดตั้ง — เราไปอ่าน rollout ของมันเองทุกจังหวะแทน
+    private let codex = CodexWatcher()
+    /// ไม่ต้องสแกนโฟลเดอร์ทุกวินาที — งานจริงของ Codex ช้ากว่านั้นมาก
+    private var pulses = 0
+    private let codexEvery = 2
 
     /// ทุกกี่วินาทีที่คำนวณ snapshot ใหม่ — สถานะหลายอย่างเกิดจากเวลาผ่านไปเฉยๆ
     /// (นอน, เกณฑ์เตือน 45 วิ, นาฬิกาเปลี่ยนนาที) ไม่ใช่จากเหตุการณ์
@@ -77,6 +82,14 @@ public final class Daemon {
     private func pulse() {
         let now = Date()
         for t in transports { t.tick(now: now) }
+
+        pulses += 1
+        if pulses % codexEvery == 0 {
+            for e in codex.poll(now: now) {
+                Log.debug("codex \(e.hookEventName) \(e.toolName ?? "")")
+                store.apply(e, now: now)
+            }
+        }
         publish()
     }
 

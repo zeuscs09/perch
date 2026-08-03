@@ -37,6 +37,15 @@ public struct ToolMap: Sendable {
             "Workflow": .thinking,
             "Skill": .thinking,
 
+            // เครื่องมือของ Codex CLI — ชื่อเป็น snake_case จึงไม่ชนกับของ Claude Code
+            // Codex เรียก "exec" แทบทุกอย่าง (แก้ไฟล์ผ่าน shell ด้วย) จึงจัดเป็น building
+            // เหมือน Bash ส่วนการแพตช์ไฟล์มี event แยกของมันเอง
+            "exec": .building,
+            "shell": .building,
+            "apply_patch": .writing,
+            "update_plan": .thinking,
+            "web_search": .searching,
+
             // คุยกับบริการนอกตัว ไม่ใช่อ่านไฟล์หรือค้นเว็บ — ควรแยกให้เห็นว่ารออีกฝั่งอยู่
             "LSP": .beacon,
             "ListMcpResourcesTool": .beacon,
