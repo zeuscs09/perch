@@ -955,10 +955,12 @@ static uint16_t usage_bar_color(const ct_usage_t *u, int window)
 // ต้องตรงกับ fmt_remaining ใน tools/gen/screen.py
 static void usage_reset_text(const ct_usage_t *u, char *out, size_t cap)
 {
+    // ช่องที่เหลือหลังหักเลข % กับ pill เหลือราว 42px ที่ฟอนต์ 12 — ราว 7 ตัวอักษร
+    // ทุกคำในนี้จึงถูกเลือกให้สั้นกว่านั้น ไม่ใช่ให้อ่านลื่นที่สุด
     if (u->remaining < 0) {
-        snprintf(out, cap, "no data");
+        snprintf(out, cap, "no eta");
     } else if (u->remaining == 0) {
-        snprintf(out, cap, "resetting");
+        snprintf(out, cap, "reset");
     } else {
         int d = u->remaining / 86400;
         int h = (u->remaining % 86400) / 3600;
@@ -1130,7 +1132,22 @@ static void layout_usage(void)
         // ความกว้างของป้ายเลข % เพิ่งเปลี่ยนตามข้อความ ("100%" กว้างกว่า "35%" ~13px)
         // ต้องบังคับให้ LVGL คิดขนาดใหม่ก่อน ไม่งั้นจัดชิดกับความกว้างของเฟรมก่อนหน้า
         lv_obj_update_layout(row->percent);
-        lv_obj_align_to(row->reset, row->percent, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
+
+        // เพดานความกว้างของข้อความเวลา — ไม่ใช่การเผื่อ แต่เป็นการรับประกัน
+        //
+        // ป้ายนี้เกาะขอบขวาของเลข % ซึ่งกว้างไม่เท่ากันในแต่ละค่า ส่วน pill อยู่ชิดขอบขวา
+        // ของช่องตายตัว ระยะที่เหลือจึงเปลี่ยนไปตามข้อมูล การเลือกคำให้สั้นพอจึงเป็นการ
+        // เดาที่ถูกได้เฉพาะกับคำที่มีอยู่วันนี้ — เคยล้นมาแล้วสองครั้ง ("Resets in ..."
+        // และ "resetting") ทั้งที่ครั้งแรกก็แก้ด้วยการย่อคำเหมือนกัน
+        //
+        // ตัดด้วยจุดไข่ปลาเมื่อไม่พอ ดีกว่าทับ pill: ข้อความที่อ่านไม่ครบยังบอกว่ามีอะไรอยู่
+        // ส่วนตัวอักษรที่ซ้อนกันอ่านไม่ออกทั้งคู่
+        int gap = 5;
+        int avail = USAGE_CELL_W - USAGE_PILL_W - lv_obj_get_width(row->percent) - gap - 2;
+        if (avail < 0) avail = 0;
+        lv_obj_set_width(row->reset, avail);
+        lv_label_set_long_mode(row->reset, LV_LABEL_LONG_DOT);
+        lv_obj_align_to(row->reset, row->percent, LV_ALIGN_OUT_RIGHT_MID, gap, 0);
     }
 }
 
