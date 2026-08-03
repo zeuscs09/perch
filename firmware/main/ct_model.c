@@ -48,6 +48,7 @@ void ct_model_clear(ct_snapshot_t *s)
 {
     memset(s, 0, sizeof(*s));
     strcpy(s->clock, "--:--");
+    s->temperature = CT_TEMP_UNKNOWN;
     for (int i = 0; i < CT_USAGE_ROWS; i++) {
         s->usage[i].percent = CT_USAGE_UNKNOWN;
         s->usage[i].remaining = CT_USAGE_UNKNOWN;
@@ -126,6 +127,18 @@ bool ct_model_parse(const char *json, int len, ct_snapshot_t *out)
             row++;
         }
         tmp.has_usage = row > 0;
+    }
+
+    // "w" = [condition, องศา C] — array ด้วยเหตุผลเดียวกับ "u" คือคีย์กินไบต์
+    const cJSON *w = cJSON_GetObjectItem(root, "w");
+    if (cJSON_IsArray(w)) {
+        const cJSON *cond = cJSON_GetArrayItem(w, 0);
+        const cJSON *temp = cJSON_GetArrayItem(w, 1);
+        if (cJSON_IsNumber(cond) && cond->valueint >= 0 && cond->valueint < CT_WEATHER_COUNT) {
+            tmp.weather = (ct_weather_t)cond->valueint;
+            tmp.has_weather = true;
+        }
+        if (cJSON_IsNumber(temp)) tmp.temperature = temp->valueint;
     }
 
     cJSON_Delete(root);

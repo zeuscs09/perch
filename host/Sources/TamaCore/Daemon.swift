@@ -15,6 +15,8 @@ public final class Daemon {
     /// ไม่ต้องสแกนโฟลเดอร์ทุกวินาที — งานจริงของ Codex ช้ากว่านั้นมาก
     private var pulses = 0
     private let codexEvery = 2
+    /// อากาศเปลี่ยนช้ากว่าทุกอย่างบนจอนี้ — ตัวมันเองคุมจังหวะยิงเน็ต
+    private let weather = WeatherPoller()
 
     /// ทุกกี่วินาทีที่คำนวณ snapshot ใหม่ — สถานะหลายอย่างเกิดจากเวลาผ่านไปเฉยๆ
     /// (นอน, เกณฑ์เตือน 45 วิ, นาฬิกาเปลี่ยนนาที) ไม่ใช่จากเหตุการณ์
@@ -90,6 +92,7 @@ public final class Daemon {
                 store.apply(e, now: now)
             }
         }
+        weather.tick(now: now)
         publish()
     }
 
@@ -98,6 +101,10 @@ public final class Daemon {
         let now = Date()
         var snapshot = store.snapshot(now: now)
         snapshot.usage = UsageReader.read(now: now)
+        if let w = weather.reading {
+            snapshot.weather = WeatherSnap(
+                condition: w.condition.rawValue, temperature: w.temperature)
+        }
         guard let data = try? snapshot.encoded() else { return }
         guard data != lastSent else { return }
         lastSent = data

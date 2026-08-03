@@ -34,6 +34,14 @@
 #define CT_USAGE_WARN_PCT            60
 #define CT_USAGE_CRIT_PCT            85
 
+#define CT_WEATHER_DROPS             26
+#define CT_WEATHER_DROP_LEN          7
+#define CT_WEATHER_DROP_SLANT        2
+#define CT_WEATHER_DROP_SPEED_PX_S   150
+#define CT_WEATHER_OVERCAST_CLOUDS   7
+#define CT_WEATHER_FLASH_EVERY_S     9.0f
+#define CT_WEATHER_FLASH_HOLD_S      0.12f
+
 #define CT_STROLL_SPEED_PX_S         34
 #define CT_STROLL_PAUSE_S            2.5f
 #define CT_STROLL_PAD_PX             96
@@ -114,6 +122,11 @@ static const int16_t ct_sky_grass_x[CT_SKY_GRASS_X_COUNT] = {
 #define CT_COL_STEEL                 0x53B1
 #define CT_COL_ALERT                 0xDAA9
 #define CT_COL_GOOD                  0x5D4B
+#define CT_COL_SKY_OVERCAST          0x6BD0
+#define CT_COL_SKY_STORM             0x3A29
+#define CT_COL_RAIN                  0x9E3B
+#define CT_COL_LIGHTNING             0xFFBB
+#define CT_COL_FOG                   0x9D15
 #define CT_COL_CODEX                 0x4D58
 #define CT_COL_CODEX_DARK            0x33B1
 #define CT_COL_CODEX_SLEEP           0x2A6B

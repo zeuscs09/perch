@@ -228,14 +228,25 @@ static void draw_stars(lv_layer_t *layer, ct_sky_phase_t phase)
     }
 }
 
+// ประกาศล่วงหน้า — draw_clouds ต้องรู้ว่าฟ้าปิดอยู่ไหม แต่บล็อกอากาศอยู่ใต้มัน
+static bool weather_is_covered(void);
+
 static void draw_clouds(lv_layer_t *layer, ct_sky_phase_t phase, float t)
 {
-    if (phase == CT_SKY_NIGHT) return;
     uint16_t color = SKY_CLOUD[phase];
+    // กลางคืนปกติไม่มีเมฆ (มองไม่เห็น) แต่ตอนฟ้าปิดต้องเห็น ไม่งั้นฝนตกลงมาจากฟ้าโล่ง
+    if (phase == CT_SKY_NIGHT) {
+        if (!weather_is_covered()) return;
+        color = CT_COL_SKY_OVERCAST;
+    }
+    // ฟ้าปิดใช้ก้อนเพิ่ม โดยหาตำแหน่งของก้อนที่เกินตารางเดิมจากดัชนีของมันเอง
+    int count = weather_is_covered() ? CT_WEATHER_OVERCAST_CLOUDS : CT_SKY_CLOUDS_COUNT;
     float span = (float)(CT_SCREEN_WIDTH + 2 * CT_SKY_CLOUD_PAD);
-    for (int i = 0; i < CT_SKY_CLOUDS_COUNT; i++) {
-        float base_x = ct_sky_clouds[i][0];
-        int y = ct_sky_clouds[i][1], w = ct_sky_clouds[i][2];
+    for (int i = 0; i < count; i++) {
+        bool extra = i >= CT_SKY_CLOUDS_COUNT;
+        float base_x = extra ? (float)((i * 83 + 29) % CT_SCREEN_WIDTH) : ct_sky_clouds[i][0];
+        int y = extra ? (34 + (i * 17) % 46) : ct_sky_clouds[i][1];
+        int w = extra ? (30 + (i * 11) % 26) : ct_sky_clouds[i][2];
         float x = fmodf(base_x + t * (float)CT_SKY_CLOUD_SPEED_PX_S, span) - CT_SKY_CLOUD_PAD;
         int xi = (int)lroundf(x);
         fill_rect(layer, xi, y, xi + w, y + 9, color, 4);
@@ -261,23 +272,97 @@ static void draw_grass(lv_layer_t *layer, ct_sky_phase_t phase)
     }
 }
 
+
+// ---- สภาพอากาศ ----------------------------------------------------------
+//
+// อากาศเป็น "อีกแกน" ของท้องฟ้า ไม่ใช่ phase ใหม่: เวลาของวันยังคุมความสว่างพื้นฐาน
+// ส่วนอากาศคุมว่ามีอะไรบังฟ้าอยู่ ทั้งสองแกนต้องอ่านออกพร้อมกัน (ฝนตอนกลางคืน
+// ต้องยังดูเป็นกลางคืน ไม่ใช่กลายเป็นสีเดียวกับฝนตอนบ่าย)
+
+static bool weather_is_wet(void)
+{
+    if (!s_snap.has_weather) return false;
+    return s_snap.weather == CT_WEATHER_RAIN || s_snap.weather == CT_WEATHER_STORM;
+}
+
+// ฟ้าปิดพอที่จะไม่เห็นดวงอาทิตย์/ดวงจันทร์และดาว
+static bool weather_is_covered(void)
+{
+    if (!s_snap.has_weather) return false;
+    return s_snap.weather != CT_WEATHER_CLEAR;
+}
+
+// สีฟ้าหลังหักผลของอากาศ — กลางคืนไม่ถูกแทนที่ ฟ้าปิดตอนกลางคืนก็ยังมืดเหมือนเดิม
+// (เมฆที่หนาขึ้นเป็นตัวบอกเองว่าปิด) ไม่งั้นฝนตอนตีสองจะสว่างกว่าฟ้าโปร่งตอนตีสอง
+static uint16_t weather_sky_bg(ct_sky_phase_t phase)
+{
+    if (!s_snap.has_weather || phase == CT_SKY_NIGHT) return SKY_BG[phase];
+    switch (s_snap.weather) {
+    case CT_WEATHER_CLOUDY:
+    case CT_WEATHER_RAIN: return CT_COL_SKY_OVERCAST;
+    case CT_WEATHER_STORM: return CT_COL_SKY_STORM;
+    case CT_WEATHER_FOG: return CT_COL_FOG;
+    default: return SKY_BG[phase];
+    }
+}
+
+// ฟ้าแลบ: กะพริบทั้งแผงสั้นๆ แล้วดับ — คำนวณจากเวลาล้วน ไม่เก็บสถานะ
+static bool weather_flash_on(float t)
+{
+    if (!s_snap.has_weather || s_snap.weather != CT_WEATHER_STORM) return false;
+    return fmodf(t, CT_WEATHER_FLASH_EVERY_S) < CT_WEATHER_FLASH_HOLD_S;
+}
+
+// ฝนเป็นขีดเฉียงที่วนรอบเอง ไม่ใช่ particle จริง — ตำแหน่งแนวนอนกระจายด้วย
+// ตัวคูณเฉพาะกิจให้ดูสุ่ม แต่คงที่ทุกครั้งที่บูต (ภาพนิ่งเวลาหยุดเวลา = ดีบักง่าย)
+static void draw_rain(lv_layer_t *layer, float t)
+{
+    const int top = CT_TOPBAR_HEIGHT;
+    const int span = CT_SKY_HORIZON - top;
+    if (span <= 0) return;
+
+    for (int i = 0; i < CT_WEATHER_DROPS; i++) {
+        int x0 = (i * 61 + 13) % CT_SCREEN_WIDTH;
+        // เหลื่อมเวลาเริ่มของแต่ละหยด ไม่งั้นตกเป็นแถวเดียวกันทั้งจอ
+        float off = fmodf(t * CT_WEATHER_DROP_SPEED_PX_S + (float)(i * 37 % span), (float)span);
+        int y0 = top + (int)off;
+        int y1 = y0 + CT_WEATHER_DROP_LEN;
+        if (y1 >= CT_SKY_HORIZON) y1 = CT_SKY_HORIZON - 1;
+        if (y1 <= y0) continue;
+        // เอียงด้วยการวาดทีละส่วน — เส้นเฉียงจริงแพงกว่าและมองไม่ออกที่ความยาว 7px
+        int x1 = x0 + CT_WEATHER_DROP_SLANT;
+        fill_rect(layer, x0, y0, x0, (y0 + y1) / 2, CT_COL_RAIN, 0);
+        fill_rect(layer, x1, (y0 + y1) / 2, x1, y1, CT_COL_RAIN, 0);
+    }
+}
+
 static void sky_draw_cb(lv_event_t *e)
 {
     if (s_sky_phase == CT_SKY_NONE) return;  // ไม่มีฉาก = ปล่อยให้เป็นพื้นจอเปล่า
 
     lv_layer_t *layer = lv_event_get_layer(e);
     ct_sky_phase_t phase = s_sky_phase;
-    // ฟ้าเริ่มใต้แถบบน ไม่ใช่ที่ขอบบนของแถบมาสคอต — แถบมาสคอตนั่งต่ำกว่านั้นลงมามาก
-    fill_rect(layer, 0, CT_TOPBAR_HEIGHT, CT_SCREEN_WIDTH - 1, CT_SKY_HORIZON - 1,
-              SKY_BG[phase], 0);
+    float t = (float)s_cycle + s_phase;
+    bool covered = weather_is_covered();
 
-    draw_stars(layer, phase);
-    float x, y;
-    uint16_t color;
-    sky_disc(s_sky_hours, &x, &y, &color);
-    int cx = (int)lroundf(x), cy = (int)lroundf(y), r = CT_SKY_DISC_R;
-    fill_rect(layer, cx - r, cy - r, cx + r, cy + r, color, LV_RADIUS_CIRCLE);
-    draw_clouds(layer, phase, (float)s_cycle + s_phase);
+    // ฟ้าเริ่มใต้แถบบน ไม่ใช่ที่ขอบบนของแถบมาสคอต — แถบมาสคอตนั่งต่ำกว่านั้นลงมามาก
+    uint16_t bg = weather_flash_on(t) ? CT_COL_LIGHTNING : weather_sky_bg(phase);
+    fill_rect(layer, 0, CT_TOPBAR_HEIGHT, CT_SCREEN_WIDTH - 1, CT_SKY_HORIZON - 1, bg, 0);
+
+    // ฟ้าปิด = ไม่เห็นดาวและไม่เห็นดวง ต้องหายไปพร้อมกัน ไม่งั้นอ่านเป็นฟ้าโปร่งสีแปลก
+    if (!covered) {
+        draw_stars(layer, phase);
+        float x, y;
+        uint16_t color;
+        sky_disc(s_sky_hours, &x, &y, &color);
+        int cx = (int)lroundf(x), cy = (int)lroundf(y), r = CT_SKY_DISC_R;
+        fill_rect(layer, cx - r, cy - r, cx + r, cy + r, color, LV_RADIUS_CIRCLE);
+    }
+    // หมอกคือฟ้าที่ไม่มีอะไรเลย — เมฆในหมอกมองไม่เห็นอยู่แล้ว
+    if (!s_snap.has_weather || s_snap.weather != CT_WEATHER_FOG) {
+        draw_clouds(layer, phase, t);
+    }
+    if (weather_is_wet()) draw_rain(layer, t);
 
     // พื้นดินวาดทับหลังสุด — ครึ่งล่างของดวงและเมฆที่ต่ำเกินไปถูกตัดที่เส้นขอบฟ้าเอง
     fill_rect(layer, 0, CT_SKY_HORIZON, CT_SCREEN_WIDTH - 1, CT_SCREEN_HEIGHT - 1,
@@ -976,7 +1061,14 @@ void ct_ui_set_snapshot(const ct_snapshot_t *snap)
 
     lv_label_set_text(s_clock_big, s_snap.clock);
     lv_label_set_text(s_clock_small, s_snap.clock);
-    lv_label_set_text(s_date, s_snap.date);
+    // อุณหภูมิต่อท้ายวันที่ ไม่ใช่บรรทัดใหม่ — พื้นที่นี้แชร์กับแผงโควตาอยู่แล้ว
+    if (s_snap.has_weather && s_snap.temperature != CT_TEMP_UNKNOWN) {
+        char line[CT_DATE_LEN + 12];
+        snprintf(line, sizeof(line), "%s  %d\u00b0", s_snap.date, s_snap.temperature);
+        lv_label_set_text(s_date, line);
+    } else {
+        lv_label_set_text(s_date, s_snap.date);
+    }
     lv_obj_align(s_clock_big, LV_ALIGN_TOP_MID, 0, CT_CARD_TOP + CT_CARD_HEIGHT / 2 - 32);
     lv_obj_align(s_date, LV_ALIGN_TOP_MID, 0, CT_CARD_TOP + CT_CARD_HEIGHT / 2 + 18);
 
@@ -1074,7 +1166,11 @@ void ct_ui_tick(void)
     // ไม่ใช่ทุกเฟรม — ที่ 60ms ต่อเฟรมจะได้ 16 ครั้ง/วิ โดยที่ภาพเปลี่ยนแค่ 4 ครั้ง
     if (s_sky_phase != CT_SKY_NONE) {
         int shift = (int)(((float)s_cycle + s_phase) * (float)CT_SKY_CLOUD_SPEED_PX_S);
-        if (shift != s_cloud_shift || second_passed) {
+        // ฝนวิ่ง 150px/วิ ถ้าใช้เกตของเมฆ (4px/วิ) จะเห็นเป็นภาพนิ่งกระตุก
+        // ฟ้าแลบก็สั้นกว่าคาบของเกตเดิม จึงต้องวาดทุกเฟรมตอนมีอากาศเคลื่อนไหว
+        bool animated = weather_is_wet() || (s_snap.has_weather
+                                             && s_snap.weather == CT_WEATHER_STORM);
+        if (shift != s_cloud_shift || second_passed || animated) {
             s_cloud_shift = shift;
             invalidate_sky_band();
         }

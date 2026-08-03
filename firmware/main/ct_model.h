@@ -62,6 +62,20 @@ typedef struct {
     int remaining;  // วินาที — บอร์ดนับถอยลงเอง ระหว่างที่ยังไม่มี snapshot ใหม่
 } ct_usage_t;
 
+// สภาพอากาศ — อีกแกนของท้องฟ้า คนละแกนกับ phase (เวลาของวัน)
+// ต้องตรงกับ Weather.Condition ฝั่ง host ห้ามเรียงใหม่
+typedef enum {
+    CT_WEATHER_CLEAR = 0,
+    CT_WEATHER_CLOUDY,
+    CT_WEATHER_RAIN,
+    CT_WEATHER_STORM,
+    CT_WEATHER_FOG,
+    CT_WEATHER_COUNT,
+} ct_weather_t;
+
+// อุณหภูมิที่ไม่รู้ — ติดลบได้จริง จึงใช้ค่าที่พ้นช่วงจริงไปมาก
+#define CT_TEMP_UNKNOWN (-999)
+
 typedef struct {
     char clock[CT_CLOCK_LEN];
     char date[CT_DATE_LEN];
@@ -76,6 +90,10 @@ typedef struct {
     // false = ไม่เคยได้ข้อมูลโควตาเลย -> จอถอยไปเป็นนาฬิกาตั้งโต๊ะ ไม่ใช่วาดโครงเปล่า
     bool has_usage;
     ct_usage_t usage[CT_USAGE_ROWS];
+    // false = ไม่เคยได้ข้อมูลอากาศ -> ฟ้าใสตามเดิม ไม่ใช่วาดฝนเปล่าๆ
+    bool has_weather;
+    ct_weather_t weather;
+    int temperature;
 } ct_snapshot_t;
 
 // เดินนาฬิกาถอยหลังไป `secs` วินาที — เรียกจากลูปหลัก ไม่ใช่ตอนรับ snapshot

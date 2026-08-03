@@ -227,6 +227,33 @@ public struct UsageSnap: Codable, Equatable, Sendable {
     }
 }
 
+/// สภาพอากาศ — เข้ารหัสเป็น `[condition, องศา C]` ด้วยเหตุผลเดียวกับ UsageSnap
+/// คือคีย์กินไบต์ในงบที่แชร์กับ session และ card
+public struct WeatherSnap: Codable, Equatable, Sendable {
+    /// อุณหภูมิที่ไม่รู้ — ติดลบได้จริง (-40) จึงใช้ค่าที่พ้นช่วงจริงไปมาก
+    public static let unknownTemp = -999
+
+    public var condition: Int
+    public var temperature: Int
+
+    public init(condition: Int, temperature: Int) {
+        self.condition = condition
+        self.temperature = temperature
+    }
+
+    public init(from decoder: Decoder) throws {
+        var c = try decoder.unkeyedContainer()
+        condition = try c.decode(Int.self)
+        temperature = try c.decode(Int.self)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.unkeyedContainer()
+        try c.encode(condition)
+        try c.encode(temperature)
+    }
+}
+
 /// ก้อนเดียวที่อธิบายทั้งหน้าจอ — firmware วาดจากสิ่งนี้อย่างเดียว ไม่เก็บสถานะเอง
 /// ต้องพอดี 1 MTU (517) เสมอ ดู `encoded(maxBytes:)`
 public struct Snapshot: Codable, Equatable, Sendable {
@@ -241,6 +268,8 @@ public struct Snapshot: Codable, Equatable, Sendable {
     /// `[session, weekly]` เสมอเมื่อมี — `nil` แปลว่าไม่เคยได้ข้อมูลเลย
     /// ซึ่งบอร์ดตีความว่า "ถอยไปเป็นนาฬิกาตั้งโต๊ะ" ไม่ใช่ "วาดโครงเปล่า"
     public var usage: [UsageSnap]?
+    /// `nil` = ผู้ใช้ไม่ได้ตั้งพิกัด หรือยังยิงไม่สำเร็จสักครั้ง -> ฟ้าใสตามเดิม
+    public var weather: WeatherSnap?
 
     enum CodingKeys: String, CodingKey {
         case clock = "c"
@@ -250,6 +279,7 @@ public struct Snapshot: Codable, Equatable, Sendable {
         case cards = "n"
         case cardOverflow = "m"
         case usage = "u"
+        case weather = "w"
     }
 
     public init(
@@ -259,7 +289,8 @@ public struct Snapshot: Codable, Equatable, Sendable {
         sessions: [SessionSnap] = [],
         cards: [CardSnap] = [],
         cardOverflow: Int = 0,
-        usage: [UsageSnap]? = nil
+        usage: [UsageSnap]? = nil,
+        weather: WeatherSnap? = nil
     ) {
         self.clock = clock
         self.date = date
@@ -268,6 +299,7 @@ public struct Snapshot: Codable, Equatable, Sendable {
         self.cards = cards
         self.cardOverflow = cardOverflow
         self.usage = usage
+        self.weather = weather
     }
 }
 
@@ -314,6 +346,12 @@ extension Snapshot {
             // ใบที่ถูกตัดเพราะ MTU ล้นก็ยังต้องนับ — จอต้องบอกได้ว่ามีอีกกี่ใบ
             // ไม่ว่ามันหายไปเพราะจอวาดไม่พอหรือเพราะสายส่งไม่พอ
             copy.cardOverflow += 1
+            data = try encoder.encode(copy)
+            if data.count <= maxBytes { return data }
+        }
+        // อากาศตกก่อนโควตา — มันคือบรรยากาศ ไม่ใช่ข้อมูลที่ใครต้องตัดสินใจจากมัน
+        if copy.weather != nil {
+            copy.weather = nil
             data = try encoder.encode(copy)
             if data.count <= maxBytes { return data }
         }
