@@ -17,6 +17,7 @@
 #define CT_BODY_LEN 52
 #define CT_CLOCK_LEN 8
 #define CT_DATE_LEN 16
+#define CT_PLACE_LEN 20
 
 typedef enum {
     CT_CARD_INFO = 0,
@@ -94,6 +95,8 @@ typedef struct {
     bool has_weather;
     ct_weather_t weather;
     int temperature;
+    // ชื่อสถานที่สำหรับป้ายบนแถบบน — ว่าง = daemon ไม่ได้ตั้ง บอร์ดใช้ชื่อตัวเองแทน
+    char place[CT_PLACE_LEN];
 } ct_snapshot_t;
 
 // เดินนาฬิกาถอยหลังไป `secs` วินาที — เรียกจากลูปหลัก ไม่ใช่ตอนรับ snapshot

@@ -293,6 +293,8 @@ public struct Snapshot: Codable, Equatable, Sendable {
     public var usage: [UsageSnap]?
     /// `nil` = ผู้ใช้ไม่ได้ตั้งพิกัด หรือยังยิงไม่สำเร็จสักครั้ง -> ฟ้าใสตามเดิม
     public var weather: WeatherSnap?
+    /// ชื่อสถานที่สำหรับป้ายบนแถบบน — `nil` = ไม่ได้ตั้ง บอร์ดใช้ป้ายเดิมของมัน
+    public var place: String?
 
     enum CodingKeys: String, CodingKey {
         case clock = "c"
@@ -303,6 +305,7 @@ public struct Snapshot: Codable, Equatable, Sendable {
         case cardOverflow = "m"
         case usage = "u"
         case weather = "w"
+        case place = "l"
     }
 
     public init(
@@ -313,7 +316,8 @@ public struct Snapshot: Codable, Equatable, Sendable {
         cards: [CardSnap] = [],
         cardOverflow: Int = 0,
         usage: [UsageSnap]? = nil,
-        weather: WeatherSnap? = nil
+        weather: WeatherSnap? = nil,
+        place: String? = nil
     ) {
         self.clock = clock
         self.date = date
@@ -323,6 +327,7 @@ public struct Snapshot: Codable, Equatable, Sendable {
         self.cardOverflow = cardOverflow
         self.usage = usage
         self.weather = weather
+        self.place = place
     }
 }
 
@@ -369,6 +374,11 @@ extension Snapshot {
             // ใบที่ถูกตัดเพราะ MTU ล้นก็ยังต้องนับ — จอต้องบอกได้ว่ามีอีกกี่ใบ
             // ไม่ว่ามันหายไปเพราะจอวาดไม่พอหรือเพราะสายส่งไม่พอ
             copy.cardOverflow += 1
+            data = try encoder.encode(copy)
+            if data.count <= maxBytes { return data }
+        }
+        if copy.place != nil {
+            copy.place = nil
             data = try encoder.encode(copy)
             if data.count <= maxBytes { return data }
         }

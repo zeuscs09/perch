@@ -46,10 +46,14 @@ public enum Weather {
     public struct Location: Equatable, Sendable {
         public var latitude: Double
         public var longitude: Double
+        /// ชื่อที่ผู้ใช้ตั้งเอง — ไม่มีการ reverse-geocode เพราะนั่นต้องยิงไปอีกบริการ
+        /// และผู้ใช้รู้ดีกว่าอยู่แล้วว่าจะเรียกที่ที่ตัวเองนั่งอยู่ว่าอะไร
+        public var name: String?
 
-        public init(latitude: Double, longitude: Double) {
+        public init(latitude: Double, longitude: Double, name: String? = nil) {
             self.latitude = latitude
             self.longitude = longitude
+            self.name = name
         }
     }
 
@@ -60,18 +64,24 @@ public enum Weather {
     /// อ่านพิกัดจากไฟล์ `lat,lon` บรรทัดเดียว
     public static func location(at url: URL = configPath) -> Location? {
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-        let parts = text.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ",")
-        guard parts.count == 2,
+        // รูปแบบ: `lat,lon` หรือ `lat,lon,ชื่อ` — ชื่อมีช่องว่างได้ จึงตัดแค่สองครั้งแรก
+        let parts = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: ",", maxSplits: 2)
+        guard parts.count >= 2,
             let lat = Double(parts[0].trimmingCharacters(in: .whitespaces)),
             let lon = Double(parts[1].trimmingCharacters(in: .whitespaces)),
             (-90...90).contains(lat), (-180...180).contains(lon)
         else { return nil }
-        return Location(latitude: lat, longitude: lon)
+        let name = parts.count > 2
+            ? parts[2].trimmingCharacters(in: .whitespaces) : ""
+        return Location(latitude: lat, longitude: lon, name: name.isEmpty ? nil : name)
     }
 
     public static func save(_ loc: Location, to url: URL = configPath) throws {
         Paths.ensureStateDir()
-        try "\(loc.latitude),\(loc.longitude)\n".write(to: url, atomically: true, encoding: .utf8)
+        let line = loc.name.map { "\(loc.latitude),\(loc.longitude),\($0)" }
+            ?? "\(loc.latitude),\(loc.longitude)"
+        try (line + "\n").write(to: url, atomically: true, encoding: .utf8)
     }
 
     /// ดึงค่าปัจจุบัน — ผู้เรียกเป็นคนคุมจังหวะ ตัวนี้ไม่มีตัวจับเวลาในตัว

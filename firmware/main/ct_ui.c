@@ -1057,10 +1057,15 @@ static void layout_usage(void)
     }
 }
 
+// ประกาศล่วงหน้า — ป้ายลิงก์ถูกวาดใหม่ทั้งตอนลิงก์เปลี่ยนและตอน snapshot มาถึง
+// แต่ตัวจริงต้องอยู่ใต้ ct_ui_set_link ซึ่งเป็นเจ้าของสถานะลิงก์
+static void apply_link_label(void);
+
 void ct_ui_set_snapshot(const ct_snapshot_t *snap)
 {
     s_snap = *snap;
 
+    apply_link_label();
     lv_label_set_text(s_clock_big, s_snap.clock);
     lv_label_set_text(s_clock_small, s_snap.clock);
     // อุณหภูมิต่อท้ายวันที่ ไม่ใช่บรรทัดใหม่ — พื้นที่นี้แชร์กับแผงโควตาอยู่แล้ว
@@ -1088,6 +1093,24 @@ void ct_ui_set_snapshot(const ct_snapshot_t *snap)
     layout_usage_topbar();
 }
 
+// จำสถานะลิงก์ล่าสุดไว้ — ป้ายขึ้นกับทั้งลิงก์ *และ* ชื่อสถานที่ใน snapshot
+// ซึ่งมาคนละจังหวะกัน ตัวไหนมาทีหลังก็ต้องวาดป้ายใหม่ได้เองโดยไม่ต้องรออีกตัว
+static bool s_link_ble, s_link_wifi;
+static char s_link_ip[40];
+
+static void apply_link_label(void)
+{
+    const char *label = "no link";
+    if (s_link_ble) {
+        // ชื่อสถานที่ชนะชื่อบอร์ด: ตอนต่อติดแล้ว "ต่อกับอะไรอยู่" ไม่ใช่คำถามอีกต่อไป
+        // (ไอคอนข้างๆ ตอบให้แล้ว) พื้นที่ตรงนี้จึงมีค่ากว่าถ้าบอกอย่างอื่น
+        label = s_snap.place[0] ? s_snap.place : "tamaclaude";
+    } else if (s_link_wifi && s_link_ip[0]) {
+        label = s_link_ip;
+    }
+    lv_label_set_text(s_link, label);
+}
+
 void ct_ui_set_link(bool ble, bool wifi, const char *ip)
 {
     const icon_rect_t *parts = ICON_NONE;
@@ -1106,13 +1129,14 @@ void ct_ui_set_link(bool ble, bool wifi, const char *ip)
     // ป้ายข้างจุดพูดเรื่องเดียวกับไอคอน แต่ตอบคำถามที่ไอคอนตอบไม่ได้: "แล้วจะไปหามัน
     // ที่ไหน" — Mac ที่หาบอร์ดไม่เจอผ่าน mDNS ต้องการเลขนี้ และนั่นคือตอนที่ BLE ตายพอดี
     // (ตรงกับ _topbar ใน tools/gen/screen.py)
-    const char *label = "no link";
-    if (ble) {
-        label = "tamaclaude";
-    } else if (wifi && ip && ip[0]) {
-        label = ip;
+    s_link_ble = ble;
+    s_link_wifi = wifi;
+    s_link_ip[0] = '\0';
+    if (ip) {
+        strncpy(s_link_ip, ip, sizeof(s_link_ip) - 1);
+        s_link_ip[sizeof(s_link_ip) - 1] = '\0';
     }
-    lv_label_set_text(s_link, label);
+    apply_link_label();
 
     const int x0 = CT_SCREEN_WIDTH - 6 - CT_TOPBAR_LINK_ICON_W;
     const int y0 = (CT_TOPBAR_HEIGHT - CT_TOPBAR_LINK_ICON_H) / 2;

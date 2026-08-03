@@ -131,6 +131,8 @@ bool ct_model_parse(const char *json, int len, ct_snapshot_t *out)
     }
 
     // "w" = [condition, องศา C] — array ด้วยเหตุผลเดียวกับ "u" คือคีย์กินไบต์
+    copy_str(tmp.place, sizeof(tmp.place), cJSON_GetObjectItem(root, "l"));
+
     const cJSON *w = cJSON_GetObjectItem(root, "w");
     if (cJSON_IsArray(w)) {
         const cJSON *cond = cJSON_GetArrayItem(w, 0);
