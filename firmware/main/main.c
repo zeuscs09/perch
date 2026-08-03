@@ -8,7 +8,9 @@
 #include "ct_ble.h"
 #include "ct_lan.h"
 #include "ct_lcd.h"
+#include "ct_dim.h"
 #include "ct_led.h"
+#include "ct_touch.h"
 #include "ct_mascot.h"
 #include "ct_model.h"
 #include "ct_ui.h"
@@ -236,8 +238,19 @@ static void apply_pending(void)
         // ไม่ใช่เหตุการณ์ที่เกิดแล้วผ่านไป
         ct_led_apply(&snap, link || lan);
         ct_ui_set_snapshot(&snap);
+
+        // เกณฑ์เดียวกับที่ไฟใช้ตัดสินว่าต้องเต้น — จอกับไฟต้องไม่เถียงกันเรื่องว่า
+        // อะไรคือ "เรื่องที่ต้องมีคน" แค่ตอบคนละคำถามเกี่ยวกับมัน
+        bool needs_person = false;
+        if (link || lan) {
+            for (int i = 0; i < snap.session_count; i++) {
+                ct_state_t st = snap.sessions[i].state;
+                if (st == CT_STATE_WAITING || st == CT_STATE_ERROR) needs_person = true;
+            }
+        }
+        ct_dim_attention(needs_person);
     }
-    if (backlight >= 0) ct_lcd_set_backlight(backlight);
+    if (backlight >= 0) ct_dim_set_user(backlight);
 }
 
 void app_main(void)
@@ -253,6 +266,8 @@ void app_main(void)
     ct_mascot_init();
     ct_lcd_init();
     ct_led_init();
+    ct_touch_init();
+    ct_dim_init();
 
     lv_init();
     lv_tick_set_cb(millis_cb);
@@ -294,6 +309,10 @@ void app_main(void)
     int since_heap = 0;
     while (1) {
         apply_pending();
+        // อ่านการแตะทุกรอบ ไม่ใช่ทุกเฟรม — นิ้วที่แตะแล้วยกภายในเฟรมเดียวจะหายไป
+        // ถ้ารอถึงจังหวะวาด และการอ่านขาหนึ่งขาถูกกว่าการวาดจอมาก
+        if (ct_touch_tapped(step_ms)) ct_dim_wake();
+        ct_dim_tick(step_ms);
         since_frame += step_ms;
         if (since_frame >= 60) {  // ~16 เฟรมต่อวินาที พอสำหรับอนิเมชันบล็อกสี่เหลี่ยม
             ct_ui_tick();

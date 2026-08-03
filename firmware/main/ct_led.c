@@ -1,5 +1,7 @@
 #include "ct_led.h"
 
+#include "ct_lcd.h"  // การจอง LEDC ของไฟหลัง ที่ไฟล์นี้ต้องเลี่ยง
+
 #include <math.h>
 
 #include "driver/ledc.h"
@@ -21,7 +23,17 @@
 #define PIN_G 16
 #define PIN_B 17
 
-#define LED_TIMER LEDC_TIMER_0
+// ห้ามใช้ timer/channel เดียวกับไฟหลัง (ดูเหตุผลใน ct_lcd.h) — ตรวจตอนคอมไพล์
+// เพราะการชนกันของ LEDC ไม่ทำให้ build พังและไม่มี log บอก มันแค่ทำงานผิดเงียบๆ
+#define LED_TIMER_NUM 1
+#define LED_CHANNEL_BASE 3
+_Static_assert(LED_TIMER_NUM != CT_LCD_BL_TIMER_NUM,
+               "RGB LED กับไฟหลังใช้ LEDC timer ทับกัน");
+_Static_assert(CT_LCD_BL_CHANNEL_NUM < LED_CHANNEL_BASE
+                   || CT_LCD_BL_CHANNEL_NUM > LED_CHANNEL_BASE + 2,
+               "RGB LED กับไฟหลังใช้ LEDC channel ทับกัน");
+
+#define LED_TIMER ((ledc_timer_t)LED_TIMER_NUM)
 #define LED_MODE LEDC_LOW_SPEED_MODE
 #define LED_MAX 255
 
@@ -65,7 +77,7 @@ static void write_rgb(uint8_t r, uint8_t g, uint8_t b)
     // active low: duty สูง = หรี่ จึงกลับค่าก่อนเขียน
     const uint8_t v[3] = {r, g, b};
     for (int i = 0; i < 3; i++) {
-        ledc_channel_t ch = (ledc_channel_t)(LEDC_CHANNEL_0 + i);
+        ledc_channel_t ch = (ledc_channel_t)(LED_CHANNEL_BASE + i);
         ledc_set_duty(LED_MODE, ch, LED_MAX - v[i]);
         ledc_update_duty(LED_MODE, ch);
     }
@@ -101,7 +113,7 @@ void ct_led_init(void)
         ledc_channel_config_t ch = {
             .gpio_num = pins[i],
             .speed_mode = LED_MODE,
-            .channel = (ledc_channel_t)(LEDC_CHANNEL_0 + i),
+            .channel = (ledc_channel_t)(LED_CHANNEL_BASE + i),
             .timer_sel = LED_TIMER,
             .duty = LED_MAX,  // active low -> ดับ
             .hpoint = 0,
