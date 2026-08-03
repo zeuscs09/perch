@@ -351,15 +351,16 @@ def _cards(draw: ImageDraw.ImageDraw, cards: list[Card], overflow: int) -> None:
                   font=font(11), fill=quantize565(PAL.text_dim), anchor="rm")
 
 
-def fmt_remaining(secs: int | None) -> str:
+def fmt_remaining(secs: int | None, terse: bool = False) -> str:
     """วินาทีที่เหลือ -> ข้อความสั้นที่สุดที่ยังบอกได้ว่าควรรีบไหม
 
     ระดับความละเอียดลดลงตามระยะ: ใกล้ = นาที, ไกล = ชั่วโมง/วัน
     ที่ 0 ไม่ใช่ "0m" แต่เป็น "reset" เพราะ % ที่ถืออยู่หมดอายุไปแล้ว
 
-    ต้องตรงกับ usage_reset_text ใน firmware/main/ct_ui.c ทุกตัวอักษร รวมช่องว่าง —
-    ช่องที่เหลือหลังหักเลข % กับ pill มีราว 42px ที่ฟอนต์ 12 (ราว 7 ตัวอักษร)
-    ทุกคำในนี้จึงถูกเลือกให้สั้นกว่านั้น ไม่ใช่ให้อ่านลื่นที่สุด
+    ต้องตรงกับ usage_reset_text ใน firmware/main/ct_ui.c ทุกตัวอักษร รวมช่องว่าง
+
+    `terse` = ตัดหน่วยเล็กทิ้ง ใช้ตอนที่ยาวเต็มใส่ไม่ลง — "4d" ยังตอบว่าอีกนานไหม
+    ส่วน "4d…" ตอบไม่ได้อะไรเลยนอกจากบอกว่าจอแคบ
     """
     if secs is None:
         return "no eta"  # `--` ลอยเดี่ยวบนบรรทัดข้อความอ่านเป็นขยะ ไม่ใช่สถานะ
@@ -369,9 +370,9 @@ def fmt_remaining(secs: int | None) -> str:
     h, rem = divmod(rem, 3600)
     m = rem // 60
     if d:
-        return f"{d}d{h}h"
+        return f"{d}d" if terse else f"{d}d{h}h"
     if h:
-        return f"{h}h{m:02d}m"
+        return f"{h}h" if terse else f"{h}h{m:02d}m"
     return f"{m}m"
 
 
@@ -436,11 +437,15 @@ def _usage_row(draw: ImageDraw.ImageDraw, u: Usage, y: int, x0: int, x1: int) ->
     # ตัดตามความกว้างที่เหลือจริง ไม่ใช่หวังว่าคำจะสั้นพอ — preview ที่ยอมให้ตัวอักษร
     # ล้นได้ในขณะที่บอร์ดตัด จะไม่มีวันแสดงอาการล้นให้เห็นก่อนแฟลช ซึ่งเป็นเหตุผลเดียว
     # ที่ preview นี้มีอยู่
-    txt = fmt_remaining(u.remaining)
     big_w = draw.textlength(big, font=font(24)) + 2  # +2 = stroke_width ทั้งสองข้าง
-    tx = x0 + big_w + 5
-    avail = (x1 - USAGE_PILL_W) - tx - 2
-    draw.text((tx, y + 14), _fit(draw, txt, font(11), avail), font=font(11),
+    tx = x0 + big_w + 4
+    avail = (x1 - USAGE_PILL_W) - tx
+    # เลือกแบบเดียวกับ set_reset_text บนบอร์ด: ลดความละเอียดก่อน ค่อยตัดตัวอักษร
+    ft = font(11)
+    txt = fmt_remaining(u.remaining)
+    if draw.textlength(txt, font=ft) > avail:
+        txt = fmt_remaining(u.remaining, terse=True)
+    draw.text((tx, y + 14), _fit(draw, txt, ft, avail), font=ft,
               fill=quantize565(PAL.text_dim), anchor="lm")
 
     # ป้ายชื่อหน้าต่างชิดขวา — สีคงที่ต่อหน้าต่าง ไม่ตามระดับการใช้

@@ -966,9 +966,12 @@ static uint16_t usage_bar_color(const ct_usage_t *u, int window)
 
 // วินาทีที่เหลือ -> ข้อความสั้นที่สุดที่ยังบอกได้ว่าควรรีบไหม
 // ต้องตรงกับ fmt_remaining ใน tools/gen/screen.py
-static void usage_reset_text(const ct_usage_t *u, char *out, size_t cap)
+//
+// `terse` = ตัดหน่วยเล็กทิ้ง ใช้ตอนที่ยาวเต็มใส่ไม่ลง — "4d" ยังตอบว่าอีกนานไหม
+// ส่วน "4d…" ตอบไม่ได้อะไรเลยนอกจากบอกว่าจอแคบ
+static void usage_reset_text(const ct_usage_t *u, char *out, size_t cap, bool terse)
 {
-    // ช่องที่เหลือหลังหักเลข % กับ pill เหลือราว 42px ที่ฟอนต์ 12 — ราว 7 ตัวอักษร
+    // ช่องที่เหลือหลังหักเลข % กับ pill เหลือราว 40px ที่ฟอนต์ 12 — ราว 6 ตัวอักษร
     // ทุกคำในนี้จึงถูกเลือกให้สั้นกว่านั้น ไม่ใช่ให้อ่านลื่นที่สุด
     if (u->remaining < 0) {
         snprintf(out, cap, "no eta");
@@ -981,13 +984,31 @@ static void usage_reset_text(const ct_usage_t *u, char *out, size_t cap)
         // ไม่มีคำว่า "Resets in" — ในตาราง 2 คอลัมน์ช่องกว้างครึ่งเดียว ข้อความเต็ม
         // (~90px) ล้นไปทับ pill ส่วน pill ก็บอกอยู่แล้วว่ากำลังอ่านหน้าต่างไหน
         if (d) {
-            snprintf(out, cap, "%dd%dh", d, h);
+            terse ? snprintf(out, cap, "%dd", d) : snprintf(out, cap, "%dd%dh", d, h);
         } else if (h) {
-            snprintf(out, cap, "%dh%02dm", h, m);
+            terse ? snprintf(out, cap, "%dh", h) : snprintf(out, cap, "%dh%02dm", h, m);
         } else {
             snprintf(out, cap, "%dm", m);
         }
     }
+}
+
+// เลือกข้อความที่ยาวที่สุดที่ยังใส่ลงในที่ว่างจริง
+//
+// วัดเอา ไม่ใช่คำนวณจากจำนวนตัวอักษร — ความกว้างของเลข % เปลี่ยนตามค่า ("--%" กับ
+// "100%" ต่างกันหลายพิกเซล) และฟอนต์ไม่ได้กว้างเท่ากันทุกตัว การเดาเคยพลาดมาแล้ว
+// จนค่าปกติอย่าง "4d22h" โดนตัดเหลือ "4d…" ทั้งที่ไม่มีอะไรทับกันเลย
+static void set_reset_text(lv_obj_t *label, const ct_usage_t *u, int avail)
+{
+    char buf[24];
+    for (int terse = 0; terse <= 1; terse++) {
+        usage_reset_text(u, buf, sizeof(buf), terse);
+        lv_point_t size;
+        lv_text_get_size(&size, buf, &lv_font_montserrat_12, 0, 0, LV_COORD_MAX,
+                         LV_TEXT_FLAG_NONE);
+        if (size.x <= avail) break;
+    }
+    lv_label_set_text(label, buf);
 }
 
 // โควตาย่อบนแถบตอนการ์ดยึดพื้นที่ล่าง — แสดงเฉพาะหน้าต่าง 5 ชม. ซึ่งเป็นตัวที่ขยับ
@@ -1138,10 +1159,6 @@ static void layout_usage(void)
             lv_obj_add_flag(row->pace, LV_OBJ_FLAG_HIDDEN);
         }
 
-        char text[24];
-        usage_reset_text(u, text, sizeof(text));
-        lv_label_set_text(row->reset, text);
-
         // ความกว้างของป้ายเลข % เพิ่งเปลี่ยนตามข้อความ ("100%" กว้างกว่า "35%" ~13px)
         // ต้องบังคับให้ LVGL คิดขนาดใหม่ก่อน ไม่งั้นจัดชิดกับความกว้างของเฟรมก่อนหน้า
         lv_obj_update_layout(row->percent);
@@ -1155,9 +1172,12 @@ static void layout_usage(void)
         //
         // ตัดด้วยจุดไข่ปลาเมื่อไม่พอ ดีกว่าทับ pill: ข้อความที่อ่านไม่ครบยังบอกว่ามีอะไรอยู่
         // ส่วนตัวอักษรที่ซ้อนกันอ่านไม่ออกทั้งคู่
-        int gap = 5;
-        int avail = USAGE_CELL_W - USAGE_PILL_W - lv_obj_get_width(row->percent) - gap - 2;
+        int gap = 4;
+        int avail = USAGE_CELL_W - USAGE_PILL_W - lv_obj_get_width(row->percent) - gap;
         if (avail < 0) avail = 0;
+        set_reset_text(row->reset, u, avail);
+        // จุดไข่ปลาเป็นด่านสุดท้าย ไม่ใช่ด่านแรก — ถึงตรงนี้ข้อความถูกย่อให้พอดีแล้ว
+        // เหลือไว้เผื่อค่าที่ยาวเกินคาดจริงๆ เพราะทับ pill แย่กว่าอ่านไม่ครบ
         lv_obj_set_width(row->reset, avail);
         lv_label_set_long_mode(row->reset, LV_LABEL_LONG_DOT);
         lv_obj_align_to(row->reset, row->percent, LV_ALIGN_OUT_RIGHT_MID, gap, 0);
