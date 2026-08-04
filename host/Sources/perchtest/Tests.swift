@@ -522,6 +522,70 @@ func runAllTests() {
         expect(!FileManager.default.fileExists(atPath: tmp.path), "no temp file is left behind")
     }
 
+    suite("antigravity sessions are found from the files agy leaves on disk") {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory
+            .appendingPathComponent("agy-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: root) }
+        for sub in ["conversations", "presence"] {
+            try fm.createDirectory(
+                at: root.appendingPathComponent(sub), withIntermediateDirectories: true)
+        }
+
+        let id = "e927bb02-06f6-498d-89d0-7676575f7f7b"
+        let db = root.appendingPathComponent("conversations/\(id).db")
+        let ws = "/Users/x/Work/Projects/talk2me_pro/agents/qa"
+
+        func touch(_ url: URL, _ when: Date) throws {
+            if !fm.fileExists(atPath: url.path) { try Data("x".utf8).write(to: url) }
+            try fm.setAttributes([.modificationDate: when], ofItemAtPath: url.path)
+        }
+        func names(_ events: [HookEvent]) -> [String] { events.map(\.hookEventName) }
+
+        // history.jsonl คือแหล่งเดียวที่บอกไดเรกทอรีของ session ได้จริง
+        try Data(
+            (#"{"display":"hi","timestamp":1,"workspace":"\#(ws)","conversationId":"\#(id)"}"# + "\n")
+                .utf8
+        ).write(to: root.appendingPathComponent("history.jsonl"))
+
+        let w = AntigravityWatcher(root: root)
+        try touch(db, t0)
+
+        let first = w.poll(now: t0)
+        expect(names(first) == ["SessionStart", "PreToolUse"],
+            "a live conversation announces itself and reads as busy")
+        expect(first.allSatisfy { $0.agent == .antigravity },
+            "every event is tagged antigravity, not the default claude")
+        expect(first.first?.cwd == ws, "the project comes from history.jsonl, not from the db")
+
+        // เงียบเกินเกณฑ์ = เทิร์นจบ ลูกบอลอยู่ที่ผู้ใช้
+        expect(names(w.poll(now: t0 + 5)) == [], "a short pause mid-turn is not a stop")
+        expect(names(w.poll(now: t0 + 30)) == ["Stop"], "going quiet ends the turn")
+        expect(names(w.poll(now: t0 + 40)) == [], "the stop is announced once, not every poll")
+
+        // เขียนไฟล์อีกครั้ง = กลับมาทำงาน
+        try touch(db, t0 + 60)
+        expect(names(w.poll(now: t0 + 61)) == ["PreToolUse"], "new writes mean it is busy again")
+
+        // presence lock ยืดเวลาได้ แต่ไม่ใช่ตัวตัดสิน
+        let lock = root.appendingPathComponent("presence/\(id).lock")
+        try touch(lock, t0)
+        expect(names(w.poll(now: t0 + 3600)).isEmpty,
+            "a held presence file keeps a long-idle session alive")
+        try fm.removeItem(at: lock)
+        expect(names(w.poll(now: t0 + 3600)).contains("SessionEnd"),
+            "with no presence file the idle session is closed")
+
+        // บทสนทนาเก่าเป็นสิบไฟล์ ต้องไม่ถูกแตะเลย
+        try touch(root.appendingPathComponent("conversations/old.db"), t0 - 86400)
+        let fresh = AntigravityWatcher(root: root).poll(now: t0 + 120)
+        // ตัวควบคุมทางบวก — ถ้าไม่มีอันนี้ ข้อล่างจะผ่านฟรีตอนที่ไม่มีอะไรถูกอ่านเลย
+        expect(fresh.contains { $0.sessionId.contains(id) },
+            "positive control: the recent conversation is still picked up")
+        expect(!fresh.contains { $0.sessionId.contains("old") },
+            "conversations outside the active window are ignored entirely")
+    }
+
     suite("hooks left under the old project name are replaced, not duplicated") {
         let new = "/Applications/Perch.app/Contents/MacOS/perch --hook"
         let old = "/Applications/TamaClaude.app/Contents/MacOS/tamaclaude --hook"

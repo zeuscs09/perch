@@ -12,7 +12,9 @@ public final class Daemon {
     private var lastSent: Data?
     /// Codex ไม่มี hook ให้ติดตั้ง — เราไปอ่าน rollout ของมันเองทุกจังหวะแทน
     private let codex = CodexWatcher()
-    /// ไม่ต้องสแกนโฟลเดอร์ทุกวินาที — งานจริงของ Codex ช้ากว่านั้นมาก
+    /// Antigravity ก็ไม่มี hook เหมือนกัน — อ่านจาก `~/.gemini/antigravity-cli`
+    private let antigravity = AntigravityWatcher()
+    /// ไม่ต้องสแกนโฟลเดอร์ทุกวินาที — งานจริงของทั้งสองตัวช้ากว่านั้นมาก
     private var pulses = 0
     private let codexEvery = 2
     /// อากาศเปลี่ยนช้ากว่าทุกอย่างบนจอนี้ — ตัวมันเองคุมจังหวะยิงเน็ต
@@ -104,6 +106,10 @@ public final class Daemon {
         if pulses % codexEvery == 0 {
             for e in codex.poll(now: now) {
                 Log.debug("codex \(e.hookEventName) \(e.toolName ?? "")")
+                store.apply(e, now: now)
+            }
+            for e in antigravity.poll(now: now) {
+                Log.debug("antigravity \(e.hookEventName) \(e.cwd ?? "")")
                 store.apply(e, now: now)
             }
         }
