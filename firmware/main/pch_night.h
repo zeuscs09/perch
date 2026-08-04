@@ -15,12 +15,12 @@
 
 // เวลาปัจจุบันจาก snapshot ("HH:MM") — ตัวเดียวที่บอกบอร์ดว่าตอนนี้กี่โมง
 // บอร์ดไม่มีนาฬิกาจริงของตัวเอง เวลาจึงมาพร้อมข้อมูลเสมอ
-void ct_night_set_clock(const char *hhmm);
+void pch_night_set_clock(const char *hhmm);
 
 // ผู้ใช้แตะจอ — ออกจากโหมดกลางคืนชั่วคราว แล้วกลับเข้าเอง
-void ct_night_wake(void);
+void pch_night_wake(void);
 
-void ct_night_tick(int elapsed_ms);
+void pch_night_tick(int elapsed_ms);
 
 // อยู่ในโหมดกลางคืนอยู่ไหม (กลางคืน *และ* ไม่ได้เพิ่งถูกแตะ)
-bool ct_night_active(void);
+bool pch_night_active(void);

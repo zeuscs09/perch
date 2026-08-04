@@ -21,17 +21,17 @@
 
 #include <stdbool.h>
 
-void ct_dim_init(void);
+void pch_dim_init(void);
 
 // ความสว่างที่ผู้ใช้ตั้งจากหน้า Preferences — เพดานของทุกอย่างในไฟล์นี้
-void ct_dim_set_user(int percent);
+void pch_dim_set_user(int percent);
 
 // มีเหตุให้ต้องสว่างเดี๋ยวนี้ (แตะจอ) — สว่างทันที ไม่ค่อยๆ ไล่ขึ้น
-void ct_dim_wake(void);
+void pch_dim_wake(void);
 
 // โหมดกลางคืน — หรี่ลงต่ำกว่าการหรี่ปกติมาก และไม่ต้องรอให้แตะติดก่อน
 // เพราะมันมีทางออกที่ไม่ขึ้นกับฮาร์ดแวร์: เช้าแล้วสว่างกลับเอง
-void ct_dim_set_night(bool on);
+void pch_dim_set_night(bool on);
 
 // เดินนาฬิกาและสั่งไฟหลัง เรียกจากลูปหลัก
-void ct_dim_tick(int elapsed_ms);
+void pch_dim_tick(int elapsed_ms);

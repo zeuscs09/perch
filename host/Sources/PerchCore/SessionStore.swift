@@ -117,7 +117,7 @@ public final class SessionStore {
     /// จำนวน slot บนจอ ที่เหลือถูกนับเป็น "+N"
     ///
     /// ต้องตรงกับ `[slots] count` ใน tools/layout.toml เสมอ — ส่งเกินไปแล้วบอร์ดตัดทิ้งเงียบๆ
-    /// (ct_model.c) และ "+N" จะนับต่ำกว่าจริง คือโกหกว่ามองเห็นครบทุก session
+    /// (pch_model.c) และ "+N" จะนับต่ำกว่าจริง คือโกหกว่ามองเห็นครบทุก session
     public let slotCount: Int
     /// ถาม kernel ว่าเจ้าของ session ยังอยู่ไหม — แทนที่ได้เพื่อให้เทสต์ไม่ต้องฆ่า process จริง
     public var isProcessAlive: (ProcessHandle) -> Bool = { ProcessTree.isAlive($0) }
@@ -354,7 +354,7 @@ public final class SessionStore {
             date: date,
             overflow: max(0, live.count - chosen.count),
             sessions: snaps,
-            // จอวาดได้ 2 ใบ (CT_CARD_MAX ใน tools/layout.toml) — ส่งเกินมาก็ถูกทิ้ง
+            // จอวาดได้ 2 ใบ (PCH_CARD_MAX ใน tools/layout.toml) — ส่งเกินมาก็ถูกทิ้ง
             // แล้วยังกิน MTU ของสิ่งที่จอใช้จริง ที่เหลือไปโผล่เป็น "+N" แทน
             cards: cards.prefix(2).map {
                 CardSnap(

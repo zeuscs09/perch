@@ -16,15 +16,15 @@ typedef struct {
     void (*on_state)(const char *json, int len);
     void (*on_config)(const char *json, int len);
     void (*on_link)(bool connected);
-} ct_ble_cbs_t;
+} pch_ble_cbs_t;
 
-void ct_ble_init(const ct_ble_cbs_t *cbs);
+void pch_ble_init(const pch_ble_cbs_t *cbs);
 
 // ส่ง JSON หนึ่งบรรทัดออก event characteristic — เงียบเมื่อยังไม่มีใครสมัครรับ
 // เรียกจากเธรดไหนก็ได้ (NimBLE ล็อกเอง) แต่ข้อความต้องพอดี MTU เดียว ไม่มีการต่อชิ้น
-void ct_ble_notify(const char *json, int len);
+void pch_ble_notify(const char *json, int len);
 
 // ชื่อที่บอร์ดโฆษณา (`perch-ab12`) — mDNS ใช้ชื่อเดียวกันนี้ ไม่ใช่ชื่อของตัวเอง
 // เพราะผู้ใช้ที่มีสองบอร์ดต้องแยกออกด้วยชื่อชุดเดียว ไม่ใช่สองชุดที่ไม่เกี่ยวกัน
-// ก่อน `ct_ble_init` จะซิงก์เสร็จจะได้ชื่อสั้นที่ยังไม่มีเลข MAC ต่อท้าย
-const char *ct_ble_name(void);
+// ก่อน `pch_ble_init` จะซิงก์เสร็จจะได้ชื่อสั้นที่ยังไม่มีเลข MAC ต่อท้าย
+const char *pch_ble_name(void);

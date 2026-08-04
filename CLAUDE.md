@@ -100,9 +100,9 @@ look at `out/`. It proves the *design*, not the C renderer.
   (star/grass/cloud positions). Python reads it via `tools/gen/config.py`; C gets it through
   the generated `firmware/main/layout.h`. **Never edit `layout.h`** — edit the TOML and rerun
   `export_layout.py`. If preview and board disagree, that is a renderer bug, by construction.
-- **`tools/gen/*.py` ↔ `firmware/main/ct_*.c`** — deliberate parallel ports, file for file:
-  `props.py`↔`ct_props.c`, `mascot.py`↔`ct_mascot.c`, `rects.py`↔`ct_rects.c`,
-  `screen.py`↔`ct_ui.c`, `sky.py` folds into `ct_ui.c`. A visual change means editing both
+- **`tools/gen/*.py` ↔ `firmware/main/pch_*.c`** — deliberate parallel ports, file for file:
+  `props.py`↔`pch_props.c`, `mascot.py`↔`pch_mascot.c`, `rects.py`↔`pch_rects.c`,
+  `screen.py`↔`pch_ui.c`, `sky.py` folds into `pch_ui.c`. A visual change means editing both
   sides; the Python side is where you iterate, the C side is the port.
 - **Assets are rect lists**, `{x, y, w, h, color}` in mascot-relative *unit* coordinates —
   no bitmaps, no sprite pipeline. The preview and the board both come from `gen/mascot.py`.
@@ -170,7 +170,7 @@ look at `out/`. It proves the *design*, not the C renderer.
 - **`-v` and `-psn_*` are not modes.** LaunchServices appends `-psn_0_12345`; an app that
   rejects unknown args dies on double-click.
 - **The `VisualState` enum is a contract with the firmware.** Adding or reordering it means
-  changing `ct_model.c`/`ct_mascot.c` too. `perchtest` guards this.
+  changing `pch_model.c`/`pch_mascot.c` too. `perchtest` guards this.
 
 ### GATT
 
@@ -187,7 +187,7 @@ When BLE has been quiet for 10 s the daemon opens a TCP connection to the board 
 port 7333 and sends the same snapshot, sealed with AES-256-GCM under a key it pushed
 over the config characteristic. The board finds nothing on its own and **never talks to
 claude.ai** — the `sessionKey` stays on the Mac. Details and the reasons are in
-`DESIGN.md` under "WiFi ▸ ทางเดินที่สอง"; the frame layout must match `ct_lan.c` byte
+`DESIGN.md` under "WiFi ▸ ทางเดินที่สอง"; the frame layout must match `pch_lan.c` byte
 for byte.
 
 ```

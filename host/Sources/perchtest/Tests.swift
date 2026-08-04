@@ -1865,7 +1865,7 @@ func runAllTests() {
         let frame = try sealer.seal(Data(#"{"c":"14:32"}"#.utf8))
 
         equal(sealer.counter, 42, "the counter continues from where the board left off")
-        // [4B len][12B nonce][ciphertext][16B tag] — ต้องตรงกับ ct_lan.c ทุกไบต์
+        // [4B len][12B nonce][ciphertext][16B tag] — ต้องตรงกับ pch_lan.c ทุกไบต์
         let header = [UInt8](frame.prefix(4))
         var declared = 0
         for byte in header { declared = (declared << 8) | Int(byte) }

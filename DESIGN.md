@@ -335,7 +335,7 @@ claude.ai /api/.../usage --payload--> UsageWriter ---'        daemon อ่า�
 - **ไม่มี TTL** — เปอร์เซ็นต์ขยับได้ก็ต่อเมื่อผู้ใช้เรียก Claude ค่าเก่าจึง *คือ* ค่าที่ถูก
   สิ่งเดียวที่ทำให้หมดอายุคือ `resets_at` ที่ผ่านไปแล้ว
 - **ลิงก์หลุด = พื้นที่ล่างว่างทั้งแถบ ทั้งการ์ดและโควตาหาย เหลือนาฬิกา**
-  (`shown_card_count()` / `usage_shown()` ใน `ct_ui.c` ↔ `Screen.shown_cards()` /
+  (`shown_card_count()` / `usage_shown()` ใน `pch_ui.c` ↔ `Screen.shown_cards()` /
   `.shown_usage()` ใน `gen/screen.py`) **การกลับคำ** — เดิมทั้งคู่ยังอยู่ โดยอ้างว่า
   countdown เดินด้วยนาฬิกาบอร์ดเองจึงยังจริง แต่นั่นตอบแค่ครึ่งเดียว: countdown จริงก็จริง
   ส่วน*เปอร์เซ็นต์*ซึ่งเป็นตัวเลขที่คนอ่านมาจาก host และไม่มีใครยืนยันแล้วว่ายังจริง —
@@ -686,16 +686,16 @@ event    ...0004   บอร์ดแจ้งกลับ — สงวนไ�
 ## ฝั่ง firmware (ESP-IDF v5.5)
 
 ```
-firmware/main/ct_lcd.c      SPI + init ILI9341 ตามผลวัด + ไฟหลัง PWM (LEDC)
-firmware/main/ct_rects.c    rect list ในพิกัด unit + ขอบ + กรอบรวม
-firmware/main/ct_props.c    prop ทั้ง 9 ชิ้น  (พอร์ตตรงจาก tools/gen/props.py)
-firmware/main/ct_mascot.c   mood + สถานะ + การจัดกึ่งกลาง (พอร์ตจาก mascot.py)
-firmware/main/ct_model.c    JSON snapshot -> struct (cJSON)
-firmware/main/ct_ui.c       หน้าจอทั้งใบด้วย LVGL 9.2 (โครงเดียวกับ screen.py)
-firmware/main/ct_ble.c      NimBLE GATT server 3 characteristic + bonding
-firmware/main/ct_wifi.c     WiFi station: สแกน จำเครือข่าย ต่อใหม่เอง (ดูหัวข้อ "WiFi")
-firmware/main/ct_lan.c      TCP 7333 + AES-GCM + mDNS — ทางเดินที่สองของ snapshot
-firmware/main/ct_led.c      RGB LED กะพริบตอนมีการเตือนใหม่
+firmware/main/pch_lcd.c      SPI + init ILI9341 ตามผลวัด + ไฟหลัง PWM (LEDC)
+firmware/main/pch_rects.c    rect list ในพิกัด unit + ขอบ + กรอบรวม
+firmware/main/pch_props.c    prop ทั้ง 9 ชิ้น  (พอร์ตตรงจาก tools/gen/props.py)
+firmware/main/pch_mascot.c   mood + สถานะ + การจัดกึ่งกลาง (พอร์ตจาก mascot.py)
+firmware/main/pch_model.c    JSON snapshot -> struct (cJSON)
+firmware/main/pch_ui.c       หน้าจอทั้งใบด้วย LVGL 9.2 (โครงเดียวกับ screen.py)
+firmware/main/pch_ble.c      NimBLE GATT server 3 characteristic + bonding
+firmware/main/pch_wifi.c     WiFi station: สแกน จำเครือข่าย ต่อใหม่เอง (ดูหัวข้อ "WiFi")
+firmware/main/pch_lan.c      TCP 7333 + AES-GCM + mDNS — ทางเดินที่สองของ snapshot
+firmware/main/pch_led.c      RGB LED กะพริบตอนมีการเตือนใหม่
 firmware/main/main.c        ประกอบทุกอย่าง + ลูปหลัก
 ```
 
@@ -714,12 +714,12 @@ firmware/main/main.c        ประกอบทุกอย่าง + ลู�
 - **เงาใต้เท้าวาดเป็นแคปซูล ไม่ใช่วงรี** — `lv_draw_rect` clamp radius ที่ครึ่งด้านสั้น
   ฝั่ง preview จึงต้องใช้ `rounded_rectangle` ตาม ไม่ใช่ `ellipse` ที่สวยกว่าแต่คนละรูป
 - **ปิด `LV_USE_TEXTAREA` ไม่ได้** — spinbox ใน LVGL 9.2 พึ่งมันแบบ `#error`
-- **`ct_model_parse` เขียนทับ snapshot เดิมทีเดียวตอนท้าย** — JSON พังกลางทางต้องไม่ทิ้ง
+- **`pch_model_parse` เขียนทับ snapshot เดิมทีเดียวตอนท้าย** — JSON พังกลางทางต้องไม่ทิ้ง
   ภาพครึ่งๆ
 - **สถานะที่ firmware ไม่รู้จักตกเป็น `idle`** ไม่ใช่ค้างจอ — daemon อาจใหม่กว่า firmware
 - **ชื่ออุปกรณ์อยู่ใน scan response ส่วน adv บรรจุ service UUID 128 บิต** — ทั้งคู่ไม่พอ
   ใน 31 ไบต์ และฝั่ง Mac สแกนด้วย UUID จึงต้องเป็นตัวที่อยู่ใน adv
-- **`ct_lan.c` เปิด server ตามการมี IP ไม่ใช่ตามการมีกุญแจ** — บอร์ดที่รับสายแล้วปฏิเสธ
+- **`pch_lan.c` เปิด server ตามการมี IP ไม่ใช่ตามการมีกุญแจ** — บอร์ดที่รับสายแล้วปฏิเสธ
   ทุกเฟรมบอกฝั่ง Mac ได้ว่ากุญแจไม่ตรง ส่วนบอร์ดที่ไม่รับสายเลยแยกไม่ออกจากบอร์ดที่ตาย
 - **สายใหม่ชนะสายเก่าเสมอ** — Mac ที่เพิ่งกลับจากหลับทิ้งซ็อกเก็ตค้างไว้ฝั่งบอร์ด ซึ่ง TCP
   ยังไม่รู้ว่าตายจนกว่า keepalive จะครบ ระหว่างนั้นจอค้างโดยไม่มีเหตุผลให้เห็น

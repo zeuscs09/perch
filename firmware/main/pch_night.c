@@ -1,4 +1,4 @@
-#include "ct_night.h"
+#include "pch_night.h"
 
 #include <stdio.h>
 
@@ -17,7 +17,7 @@
 static int s_hour = -1;  // ยังไม่เคยรู้เวลา
 static int s_wake_ms = 0;
 
-void ct_night_set_clock(const char *hhmm)
+void pch_night_set_clock(const char *hhmm)
 {
     // "HH:MM" — ที่มาเดียวของเวลาบนบอร์ดนี้ ผิดรูปแบบแปลว่าไม่รู้ ไม่ใช่เที่ยงคืน
     if (!hhmm) return;
@@ -27,16 +27,16 @@ void ct_night_set_clock(const char *hhmm)
     s_hour = h;
 }
 
-void ct_night_wake(void) { s_wake_ms = WAKE_MS; }
+void pch_night_wake(void) { s_wake_ms = WAKE_MS; }
 
-void ct_night_tick(int elapsed_ms)
+void pch_night_tick(int elapsed_ms)
 {
     if (s_wake_ms <= 0) return;
     s_wake_ms -= elapsed_ms;
     if (s_wake_ms < 0) s_wake_ms = 0;
 }
 
-bool ct_night_active(void)
+bool pch_night_active(void)
 {
     // ยังไม่เคยได้เวลา = ไม่เข้าโหมด จอมืดตั้งแต่บูตโดยที่ยังไม่รู้ว่ากี่โมง
     // แยกไม่ออกจากบอร์ดที่ต่อไม่ติด

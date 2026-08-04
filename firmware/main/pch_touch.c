@@ -1,4 +1,4 @@
-#include "ct_touch.h"
+#include "pch_touch.h"
 
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
@@ -75,7 +75,7 @@ static void wake_controller(void)
     }
 }
 
-void ct_touch_init(void)
+void pch_touch_init(void)
 {
     gpio_config_t cfg = {
         .pin_bit_mask = 1ULL << PIN_IRQ,
@@ -100,9 +100,9 @@ void ct_touch_init(void)
     s_level = s_candidate = gpio_get_level(PIN_IRQ);
 }
 
-bool ct_touch_seen(void) { return s_seen; }
+bool pch_touch_seen(void) { return s_seen; }
 
-bool ct_touch_tapped(int elapsed_ms)
+bool pch_touch_tapped(int elapsed_ms)
 {
     int now = gpio_get_level(PIN_IRQ);
     if (now != s_candidate) {

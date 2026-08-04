@@ -1,6 +1,6 @@
-#include "ct_led.h"
+#include "pch_led.h"
 
-#include "ct_lcd.h"  // การจอง LEDC ของไฟหลัง ที่ไฟล์นี้ต้องเลี่ยง
+#include "pch_lcd.h"  // การจอง LEDC ของไฟหลัง ที่ไฟล์นี้ต้องเลี่ยง
 
 #include <math.h>
 
@@ -17,20 +17,20 @@
 // คือ LED ภายนอกที่ต่อผ่านช่อง JST (ตรรกะสถานะ->สี ด้านล่างใช้ซ้ำได้ทั้งชุด)
 // โหมดหาขา — ตั้งเป็น 1 เมื่อต้องพิสูจน์ว่าไฟไม่ติดเพราะขาผิดหรือเพราะตรรกะ
 // วนสีค้างไปเรื่อยๆ โดยไม่สนใจสถานะใดๆ จึงไม่มีหน้าต่างเวลาให้พลาด
-#define CT_LED_PIN_PROBE 0
+#define PCH_LED_PIN_PROBE 0
 
 #define PIN_R 4
 #define PIN_G 16
 #define PIN_B 17
 
-// ห้ามใช้ timer/channel เดียวกับไฟหลัง (ดูเหตุผลใน ct_lcd.h) — ตรวจตอนคอมไพล์
+// ห้ามใช้ timer/channel เดียวกับไฟหลัง (ดูเหตุผลใน pch_lcd.h) — ตรวจตอนคอมไพล์
 // เพราะการชนกันของ LEDC ไม่ทำให้ build พังและไม่มี log บอก มันแค่ทำงานผิดเงียบๆ
 #define LED_TIMER_NUM 1
 #define LED_CHANNEL_BASE 3
-_Static_assert(LED_TIMER_NUM != CT_LCD_BL_TIMER_NUM,
+_Static_assert(LED_TIMER_NUM != PCH_LCD_BL_TIMER_NUM,
                "RGB LED กับไฟหลังใช้ LEDC timer ทับกัน");
-_Static_assert(CT_LCD_BL_CHANNEL_NUM < LED_CHANNEL_BASE
-                   || CT_LCD_BL_CHANNEL_NUM > LED_CHANNEL_BASE + 2,
+_Static_assert(PCH_LCD_BL_CHANNEL_NUM < LED_CHANNEL_BASE
+                   || PCH_LCD_BL_CHANNEL_NUM > LED_CHANNEL_BASE + 2,
                "RGB LED กับไฟหลังใช้ LEDC channel ทับกัน");
 
 #define LED_TIMER ((ledc_timer_t)LED_TIMER_NUM)
@@ -62,10 +62,10 @@ static float s_period_s;  // ความยาวหนึ่งรอบ
 
 // สีลำตัวมาสคอตของแต่ละเอเจนต์ในหน่วย RGB 8 บิต — ไฟกับจอต้องพูดภาษาเดียวกัน
 // เห็นไฟฟ้าแล้วต้องรู้ว่า Codex โดยไม่ต้องหันไปดูจอ (ตรงกับ [palette] ใน layout.toml)
-static const rgb_t AGENT_RGB[CT_AGENT_COUNT] = {
-    [CT_AGENT_CLAUDE] = {217, 119, 87},        // #D97757
-    [CT_AGENT_CODEX] = {79, 168, 199},         // #4FA8C7
-    [CT_AGENT_ANTIGRAVITY] = {139, 127, 217},  // #8B7FD9
+static const rgb_t AGENT_RGB[PCH_AGENT_COUNT] = {
+    [PCH_AGENT_CLAUDE] = {217, 119, 87},        // #D97757
+    [PCH_AGENT_CODEX] = {79, 168, 199},         // #4FA8C7
+    [PCH_AGENT_ANTIGRAVITY] = {139, 127, 217},  // #8B7FD9
 };
 
 // สถานะที่ไม่ได้เป็นของเอเจนต์ใดเอเจนต์หนึ่ง — ใช้สีของความหมาย ไม่ใช่ของเจ้าของ
@@ -84,7 +84,7 @@ static void write_rgb(uint8_t r, uint8_t g, uint8_t b)
     }
 }
 
-#if CT_LED_PIN_PROBE
+#if PCH_LED_PIN_PROBE
 static void led_probe_task(void *arg)
 {
     (void)arg;
@@ -98,7 +98,7 @@ static void led_probe_task(void *arg)
 }
 #endif
 
-void ct_led_init(void)
+void pch_led_init(void)
 {
     ledc_timer_config_t timer = {
         .speed_mode = LED_MODE,
@@ -127,7 +127,7 @@ void ct_led_init(void)
     // ขาของ LED ไม่เคยถูกตรวจสอบ (DESIGN.md เขียนว่า "ยังไม่ได้ตรวจ") การจะรู้ว่า
     // "ไฟไม่ติด" เป็นเรื่องขาหรือเรื่องตรรกะ ต้องมีสัญญาณที่ไม่ขึ้นกับสถานะและ
     // ไม่มีหน้าต่างเวลาให้พลาด
-#if CT_LED_PIN_PROBE
+#if PCH_LED_PIN_PROBE
     xTaskCreate(led_probe_task, "led_probe", 2048, NULL, 1, NULL);
     return;
 #endif
@@ -138,19 +138,19 @@ void ct_led_init(void)
 // การผสมสีของสามสถานะได้สีที่ไม่ได้แปลว่าอะไรเลย
 //
 // ลำดับตรงกับ VisualState.priority ฝั่ง host โดยตั้งใจ: จอกับไฟต้องไม่ขัดกัน
-static int state_rank(ct_state_t s)
+static int state_rank(pch_state_t s)
 {
     switch (s) {
-        case CT_STATE_ERROR: return 40;
-        case CT_STATE_WAITING: return 30;
-        case CT_STATE_CELEBRATE: return 15;
-        case CT_STATE_IDLE: return 5;
-        case CT_STATE_SLEEPING: return 0;
+        case PCH_STATE_ERROR: return 40;
+        case PCH_STATE_WAITING: return 30;
+        case PCH_STATE_CELEBRATE: return 15;
+        case PCH_STATE_IDLE: return 5;
+        case PCH_STATE_SLEEPING: return 0;
         default: return 20;  // กำลังทำงาน (reading/writing/building/...)
     }
 }
 
-void ct_led_set_night(bool on)
+void pch_led_set_night(bool on)
 {
     if (on == s_night) return;
     s_night = on;
@@ -161,7 +161,7 @@ void ct_led_set_night(bool on)
     // ออกจากกลางคืนไม่ต้องทำอะไร — snapshot ถัดไปจะสั่งสีที่ถูกต้องมาเองภายในหนึ่งวินาที
 }
 
-void ct_led_apply(const ct_snapshot_t *snap, bool connected)
+void pch_led_apply(const pch_snapshot_t *snap, bool connected)
 {
     if (s_night) return;  // กลางคืนดับสนิท ไม่ว่าจะมีเรื่องอะไรค้างอยู่
 
@@ -181,27 +181,27 @@ void ct_led_apply(const ct_snapshot_t *snap, bool connected)
         return;
     }
 
-    const ct_session_t *win = &snap->sessions[best];
-    ct_agent_t agent = win->agent;
-    if (agent < 0 || agent >= CT_AGENT_COUNT) agent = CT_AGENT_CLAUDE;
+    const pch_session_t *win = &snap->sessions[best];
+    pch_agent_t agent = win->agent;
+    if (agent < 0 || agent >= PCH_AGENT_COUNT) agent = PCH_AGENT_CLAUDE;
 
     led_mode_t mode;
     rgb_t color;
     float period;
     switch (win->state) {
-        case CT_STATE_ERROR:
+        case PCH_STATE_ERROR:
             // เร็วและแดง — อย่างเดียวที่ควรทำให้คนหันมาทันที
             mode = MODE_PULSE, color = RGB_ERROR, period = 0.7f;
             break;
-        case CT_STATE_WAITING:
+        case PCH_STATE_WAITING:
             // เหตุผลหลักที่ไฟดวงนี้มีอยู่: บอกว่ามีคนรอเราตอบ
             mode = MODE_PULSE, color = RGB_WAITING, period = 1.4f;
             break;
-        case CT_STATE_CELEBRATE:
+        case PCH_STATE_CELEBRATE:
             mode = MODE_STEADY, color = RGB_DONE, period = 1.0f;
             break;
-        case CT_STATE_IDLE:
-        case CT_STATE_SLEEPING:
+        case PCH_STATE_IDLE:
+        case PCH_STATE_SLEEPING:
             // ว่างแล้วดับ ไม่ใช่หรี่ — ไฟที่ติดตลอดเวลาเลิกเป็นสัญญาณ
             // กลายเป็นเฟอร์นิเจอร์ แล้วตอนที่มันสำคัญจริงก็ไม่มีใครเห็น
             mode = MODE_OFF, color = (rgb_t){0, 0, 0}, period = 1.0f;
@@ -223,7 +223,7 @@ void ct_led_apply(const ct_snapshot_t *snap, bool connected)
     if (mode == MODE_OFF) write_rgb(0, 0, 0);
 }
 
-void ct_led_tick(int elapsed_ms)
+void pch_led_tick(int elapsed_ms)
 {
     if (s_mode == MODE_OFF) return;
 

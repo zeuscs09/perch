@@ -1,4 +1,4 @@
-#include "ct_lcd.h"
+#include "pch_lcd.h"
 
 #include <string.h>
 
@@ -114,10 +114,10 @@ static void backlight_init(void)
         .hpoint = 0,
     };
     ESP_ERROR_CHECK(ledc_channel_config(&ch));
-    ct_lcd_set_backlight(100);
+    pch_lcd_set_backlight(100);
 }
 
-void ct_lcd_set_backlight(int percent)
+void pch_lcd_set_backlight(int percent)
 {
     if (percent < 0) percent = 0;
     if (percent > 100) percent = 100;
@@ -128,9 +128,9 @@ void ct_lcd_set_backlight(int percent)
     ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, BL_CHANNEL));
 }
 
-int ct_lcd_backlight(void) { return s_backlight; }
+int pch_lcd_backlight(void) { return s_backlight; }
 
-void ct_lcd_init(void)
+void pch_lcd_init(void)
 {
     gpio_config_t io = {
         .pin_bit_mask = (1ULL << PIN_CS) | (1ULL << PIN_DC),
@@ -147,7 +147,7 @@ void ct_lcd_init(void)
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
         // ก้อนใหญ่สุดที่จะส่งคือบัฟเฟอร์วาดของ LVGL หนึ่งก้อน
-        .max_transfer_sz = CT_SCREEN_WIDTH * 24 * 2 + 64,
+        .max_transfer_sz = PCH_SCREEN_WIDTH * 24 * 2 + 64,
     };
     ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &bus, SPI_DMA_CH_AUTO));
 
@@ -161,10 +161,10 @@ void ct_lcd_init(void)
 
     panel_init();
     backlight_init();
-    ESP_LOGI(TAG, "panel ready %dx%d", CT_SCREEN_WIDTH, CT_SCREEN_HEIGHT);
+    ESP_LOGI(TAG, "panel ready %dx%d", PCH_SCREEN_WIDTH, PCH_SCREEN_HEIGHT);
 }
 
-void ct_lcd_blit(int x1, int y1, int x2, int y2, const void *pixels, size_t bytes)
+void pch_lcd_blit(int x1, int y1, int x2, int y2, const void *pixels, size_t bytes)
 {
     uint8_t col[4] = {(uint8_t)(x1 >> 8), (uint8_t)x1, (uint8_t)(x2 >> 8), (uint8_t)x2};
     uint8_t row[4] = {(uint8_t)(y1 >> 8), (uint8_t)y1, (uint8_t)(y2 >> 8), (uint8_t)y2};
@@ -176,7 +176,7 @@ void ct_lcd_blit(int x1, int y1, int x2, int y2, const void *pixels, size_t byte
     dc(1);
     // แบ่งส่งเป็นก้อนตามขนาดที่ DMA รับได้ในครั้งเดียว
     const uint8_t *p = (const uint8_t *)pixels;
-    const size_t chunk = CT_SCREEN_WIDTH * 24 * 2;
+    const size_t chunk = PCH_SCREEN_WIDTH * 24 * 2;
     while (bytes) {
         size_t n = bytes > chunk ? chunk : bytes;
         spi_write(p, n);

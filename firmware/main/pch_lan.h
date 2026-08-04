@@ -16,25 +16,25 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define CT_LAN_PORT 7333
-#define CT_LAN_KEY_BYTES 32
+#define PCH_LAN_PORT 7333
+#define PCH_LAN_KEY_BYTES 32
 
 // snapshot ก้อนเดียวจบเหมือนบน BLE — ไม่มีการต่อชิ้น
-typedef void (*ct_lan_frame_cb_t)(const char *json, int len);
+typedef void (*pch_lan_frame_cb_t)(const char *json, int len);
 
 // ต้องเรียกหลัง nvs_flash_init และหลัง esp_netif_init
-void ct_lan_init(ct_lan_frame_cb_t on_frame);
+void pch_lan_init(pch_lan_frame_cb_t on_frame);
 
 // ตั้งกุญแจใหม่จาก hex 64 ตัว — ตัวนับกันเล่นซ้ำถูกล้างพร้อมกันเสมอ เพราะกุญแจใหม่
 // แปลว่า nonce ชุดเดิมใช้ซ้ำได้แล้วโดยไม่เป็นอันตราย คืน false เมื่อ hex ไม่ถูกต้อง
-bool ct_lan_set_key(const char *hex);
+bool pch_lan_set_key(const char *hex);
 
 // 8 hex ตัวแรกของ SHA-256(key) — Mac เอาไปเทียบว่าสองฝั่งถือกุญแจเดียวกันไหม
 // สตริงว่างเมื่อยังไม่เคยตั้ง · ไม่ใช่ความลับ: มันคือแฮชของกุญแจ ไม่ใช่กุญแจ
-const char *ct_lan_key_fingerprint(void);
+const char *pch_lan_key_fingerprint(void);
 
 // เปิด/ปิด server ตาม IP ที่ได้จาก DHCP — mDNS ถูกประกาศตอนขึ้นด้วย
-void ct_lan_set_up(bool up, const char *ip);
+void pch_lan_set_up(bool up, const char *ip);
 
 // มี Mac ต่ออยู่จริงไหม — ต่างจาก "WiFi ติด" ตรงที่อันนี้แปลว่า snapshot ยังไหลอยู่
-bool ct_lan_client_connected(void);
+bool pch_lan_client_connected(void);

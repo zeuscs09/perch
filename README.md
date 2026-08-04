@@ -275,7 +275,7 @@ says `Connecting`. Also close any serial monitor still holding the port.
 **The screen is on but the colours are wrong, or the image is mirrored.**
 Some batches of this board ship a different panel than the one this firmware was measured
 against. Run the probe project in `firmware/probe/` to read out what your panel actually
-reports, then change the two constants it disagrees with in `firmware/main/ct_lcd.c`:
+reports, then change the two constants it disagrees with in `firmware/main/pch_lcd.c`:
 the `0x36` (MADCTL) value for orientation and mirroring, and `0x20` (inversion off) versus
 `0x21` (inversion on) for inverted colours.
 

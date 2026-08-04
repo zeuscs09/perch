@@ -6,16 +6,16 @@
 // ส่วนสีอ่านออกจากอีกฝั่งห้องได้ทันทีโดยไม่ต้องอ่านป้ายชื่อ ซึ่งเป็นสิ่งที่ต้องการจริง
 #pragma once
 
-#include "ct_model.h"
-#include "ct_rects.h"
+#include "pch_model.h"
+#include "pch_rects.h"
 
-// ทาสีลำตัวใหม่ตามเอเจนต์ — เรียกหลัง ct_mascot_build เสมอ
+// ทาสีลำตัวใหม่ตามเอเจนต์ — เรียกหลัง pch_mascot_build เสมอ
 //
 // ทำงานโดยแทนที่ *เฉพาะ* สามเฉดของลำตัว (clay / clay_dark / clay_sleep) ชิ้นอื่น
 // อย่างตา ขอบ หมวก แว่น ไม่ถูกแตะ — ของพวกนั้นเป็นสีของ "ของ" ไม่ใช่สีของตัวละคร
 //
 // claude = ไม่ทำอะไร (จานสีต้นฉบับคือของมันอยู่แล้ว) จึงเรียกได้เสมอโดยไม่ต้องเช็คก่อน
-void ct_agent_recolor(ct_rects_t *rs, ct_agent_t agent);
+void pch_agent_recolor(pch_rects_t *rs, pch_agent_t agent);
 
 // ชื่อสั้นสำหรับป้ายบนจอ ("Claude" / "Codex" / "AG")
-const char *ct_agent_label(ct_agent_t agent);
+const char *pch_agent_label(pch_agent_t agent);

@@ -38,7 +38,7 @@ def _emit_section(name: str, values: dict) -> list[str]:
     for k, v in values.items():
         if isinstance(v, list):
             continue  # ตารางไปออกเป็น C array ไม่ใช่ #define — ดู _emit_tables
-        macro = f"CT_{name.upper()}_{k.upper()}"
+        macro = f"PCH_{name.upper()}_{k.upper()}"
         if isinstance(v, float):
             lines.append(f"#define {macro:<28} {_f(v)}")
         else:
@@ -56,8 +56,8 @@ def _emit_tables(name: str, values: dict) -> list[str]:
     for k, v in values.items():
         if not isinstance(v, list) or not v:
             continue
-        sym = f"ct_{name}_{k}"
-        count = f"CT_{name.upper()}_{k.upper()}_COUNT"
+        sym = f"pch_{name}_{k}"
+        count = f"PCH_{name.upper()}_{k.upper()}_COUNT"
         lines.append(f"#define {count:<28} {len(v)}")
         if isinstance(v[0], list):
             cols = len(v[0])
@@ -90,15 +90,15 @@ def build_header() -> str:
 
     out += [
         "// กรอบวาดมาสคอตรวม prop (หน่วย unit) — มาจาก tools/gen/props.py",
-        f"#define CT_BOX_X0                    {_f(BOX_X0)}",
-        f"#define CT_BOX_X1                    {_f(BOX_X1)}",
-        f"#define CT_BOX_Y0                    {_f(BOX_Y0)}",
-        f"#define CT_BOX_Y1                    {_f(BOX_Y1)}",
+        f"#define PCH_BOX_X0                    {_f(BOX_X0)}",
+        f"#define PCH_BOX_X1                    {_f(BOX_X1)}",
+        f"#define PCH_BOX_Y0                    {_f(BOX_Y0)}",
+        f"#define PCH_BOX_Y1                    {_f(BOX_Y1)}",
         "",
         "// จานสีเป็น RGB565 ตามที่แผงจอกินจริง",
     ]
     for k, v in _raw["palette"].items():
-        out.append(f"#define CT_COL_{k.upper():<21} 0x{to_rgb565(v):04X}")
+        out.append(f"#define PCH_COL_{k.upper():<21} 0x{to_rgb565(v):04X}")
 
     out += [
         "",
@@ -106,12 +106,12 @@ def build_header() -> str:
         "typedef enum {",
     ]
     for i, st in enumerate(mascot.all_states()):
-        out.append(f"    CT_STATE_{st.upper():<12} = {i},")
+        out.append(f"    PCH_STATE_{st.upper():<12} = {i},")
     out += [
-        f"    CT_STATE_COUNT{'':<12} = {len(mascot.all_states())},",
-        "} ct_state_t;",
+        f"    PCH_STATE_COUNT{'':<12} = {len(mascot.all_states())},",
+        "} pch_state_t;",
         "",
-        "static const char *const ct_state_names[CT_STATE_COUNT] = {",
+        "static const char *const pch_state_names[PCH_STATE_COUNT] = {",
     ]
     for st in mascot.all_states():
         out.append(f'    "{st}",')

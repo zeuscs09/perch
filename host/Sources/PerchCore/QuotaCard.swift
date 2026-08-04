@@ -7,7 +7,7 @@ import Foundation
 /// ส่วนที่เหลือ (`QuotaCardView`) เหลือแค่ "เอาค่าพวกนี้ไปวาด"
 ///
 /// ภาษาภาพเดียวกับแผงบนบอร์ด — เกณฑ์สีและสูตร pace ต้องตรงกับ `usage_bar_color`
-/// ใน `tools/gen/screen.py` และ `firmware/main/ct_ui.c`
+/// ใน `tools/gen/screen.py` และ `firmware/main/pch_ui.c`
 public struct QuotaCard: Equatable, Sendable {
     /// ระดับที่สีอ่านออกมาได้ — ไม่ใช่ `NSColor` เพราะ PerchCore ไม่รู้จัก AppKit
     /// และเพราะ "ระดับ" คือสิ่งที่เทสต์ได้ ส่วน "สี" คือการตีความของมัน

@@ -164,7 +164,7 @@ public enum AgentKind: String, Codable, Equatable, Sendable, CaseIterable {
     /// เขียนตรงๆ ทีละตัว ไม่ derive จากตัวแรกของชื่อ: claude กับ codex ขึ้นต้นด้วย c
     /// เหมือนกัน การ derive จึงทำให้ทั้งคู่ส่งค่าเดียวกันและบอร์ดแยกไม่ออก
     /// (เคยพลาดมาแล้ว — มาสคอตของ Codex ขึ้นเป็นสีของ Claude ทุกตัว)
-    /// ค่าพวกนี้อยู่บนสาย ต้องตรงกับ `agent_from_name` ใน firmware/main/ct_model.c
+    /// ค่าพวกนี้อยู่บนสาย ต้องตรงกับ `agent_from_name` ใน firmware/main/pch_model.c
     public var wire: String {
         switch self {
         case .claude: return "c"

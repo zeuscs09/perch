@@ -1,4 +1,4 @@
-#include "ct_ble.h"
+#include "pch_ble.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -14,7 +14,7 @@ void ble_store_config_init(void);
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 
-#include "ct_lcd.h"
+#include "pch_lcd.h"
 
 static const char *TAG = "ble";
 
@@ -32,7 +32,7 @@ static const ble_uuid128_t CHR_STATE = UUID128_TAMA(0x02);
 static const ble_uuid128_t CHR_CONFIG = UUID128_TAMA(0x03);
 static const ble_uuid128_t CHR_EVENT = UUID128_TAMA(0x04);
 
-static ct_ble_cbs_t s_cbs;
+static pch_ble_cbs_t s_cbs;
 static uint8_t s_addr_type;
 static uint16_t s_event_handle;
 static uint16_t s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
@@ -68,7 +68,7 @@ static int chr_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt 
         }
         case BLE_GATT_ACCESS_OP_READ_CHR: {
             char json[48];
-            int n = snprintf(json, sizeof(json), "{\"b\":%d}", ct_lcd_backlight());
+            int n = snprintf(json, sizeof(json), "{\"b\":%d}", pch_lcd_backlight());
             return os_mbuf_append(ctxt->om, json, n) == 0 ? 0
                                                          : BLE_ATT_ERR_INSUFFICIENT_RES;
         }
@@ -207,7 +207,7 @@ static void on_sync(void)
 
 static void on_reset(int reason) { ESP_LOGW(TAG, "host reset: %d", reason); }
 
-void ct_ble_notify(const char *json, int len)
+void pch_ble_notify(const char *json, int len)
 {
     if (s_conn_handle == BLE_HS_CONN_HANDLE_NONE || !s_event_subscribed) return;
     struct os_mbuf *om = ble_hs_mbuf_from_flat(json, len);
@@ -216,7 +216,7 @@ void ct_ble_notify(const char *json, int len)
     if (rc != 0) ESP_LOGW(TAG, "notify failed: %d", rc);
 }
 
-const char *ct_ble_name(void) { return s_device_name; }
+const char *pch_ble_name(void) { return s_device_name; }
 
 static void host_task(void *param)
 {
@@ -224,7 +224,7 @@ static void host_task(void *param)
     nimble_port_freertos_deinit();
 }
 
-void ct_ble_init(const ct_ble_cbs_t *cbs)
+void pch_ble_init(const pch_ble_cbs_t *cbs)
 {
     s_cbs = *cbs;
     ESP_ERROR_CHECK(nimble_port_init());

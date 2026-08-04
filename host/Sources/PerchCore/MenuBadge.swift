@@ -55,7 +55,7 @@ public struct MenuBadge: Equatable, Sendable {
     /// ตามแผนพอดี สีแดงที่ขึ้นทุกครั้งที่ใกล้หมดหน้าต่างคือสีที่ขึ้นตอนไม่มีอะไรให้ทำ
     /// แล้วมันจะหยุดเป็นสัญญาณ
     ///
-    /// สูตร pace ต้องตรงกับ `usage_bar_color` ใน `firmware/main/ct_ui.c`
+    /// สูตร pace ต้องตรงกับ `usage_bar_color` ใน `firmware/main/pch_ui.c`
     /// และ `tools/gen/screen.py` — เกณฑ์เปอร์เซ็นต์เท่านั้นที่ไม่เอามา
     /// ตัวสูตรอยู่ที่ `UsageReader` เพราะการ์ดใน popover ใช้ตัวเดียวกัน
     private static func pace(_ snap: UsageSnap) -> Int {

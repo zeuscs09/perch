@@ -83,7 +83,7 @@ class Screen:
     overflow: int = 0
     clock: str = "14:32"
     date: str = "Mon 27 Jul"
-    # มี snapshot สดอยู่ไหม — ไม่สนใจว่ามาทางไหน ตรงกับ ct_ui_set_connected
+    # มี snapshot สดอยู่ไหม — ไม่สนใจว่ามาทางไหน ตรงกับ pch_ui_set_connected
     connected: bool = True
     # บอร์ดอยู่บน WiFi แล้วหรือยัง
     wifi: bool = False
@@ -134,7 +134,7 @@ def _fit(draw: ImageDraw.ImageDraw, text: str, f: ImageFont.FreeTypeFont, max_w:
     return text + ell
 
 
-# ไอคอนลิงก์ — ต้องตรงกับ ICON_* ใน firmware/main/ct_ui.c เป๊ะ
+# ไอคอนลิงก์ — ต้องตรงกับ ICON_* ใน firmware/main/pch_ui.c เป๊ะ
 # BLE = แท่งไต่ขึ้น (ทางหลัก) · WiFi = คลื่นซ้อน (ทางสำรอง) · ขาด = ขีดเดียวจางๆ
 _ICON_BLE = [(0, 6, 3, 3), (4, 3, 3, 6), (8, 0, 3, 9)]
 _ICON_WIFI = [(0, 0, 11, 2), (2, 3, 7, 2), (4, 6, 3, 3)]
@@ -156,7 +156,7 @@ def _link_icon(draw: ImageDraw.ImageDraw, s: Screen) -> None:
 
 
 def _link_label(s: Screen) -> str:
-    """ป้ายข้างไอคอน — ตรงกับ apply_link_label ใน firmware/main/ct_ui.c
+    """ป้ายข้างไอคอน — ตรงกับ apply_link_label ใน firmware/main/pch_ui.c
 
     ชื่อสถานที่ชนะชื่อบอร์ด: ตอนต่อติดแล้ว "ต่อกับอะไรอยู่" ไม่ใช่คำถามอีกต่อไป
     (ไอคอนข้างๆ ตอบให้แล้ว) พื้นที่ตรงนี้จึงมีค่ากว่าถ้าบอกอย่างอื่น
@@ -174,7 +174,7 @@ def _topbar(draw: ImageDraw.ImageDraw, s: Screen) -> None:
     draw.rectangle([0, 0, L.screen.width - 1, h - 1], fill=quantize565(PAL.bg_slot))
     dot = PAL.good if s.connected else PAL.gray
     draw.rectangle([6, h // 2 - 3, 11, h // 2 + 2], fill=quantize565(dot))
-    # ป้ายบอกทาง ส่วนสีบอกว่าข้อมูลสดไหม — สองคำถามคนละอัน (ต้องตรงกับ ct_ui_set_link)
+    # ป้ายบอกทาง ส่วนสีบอกว่าข้อมูลสดไหม — สองคำถามคนละอัน (ต้องตรงกับ pch_ui_set_link)
     label = _link_label(s)
     draw.text((17, h // 2), label, font=font(11),
               fill=quantize565(PAL.text if s.connected else PAL.text_dim), anchor="lm")
@@ -277,7 +277,7 @@ def _slot(draw: ImageDraw.ImageDraw, i: int, sess: Session | None, s: Screen,
 
 
 # --- มาสคอตเดินเล่นตอนไม่มี session ------------------------------------------
-# ท่าที่หยุดทำกลางทาง วนไปตามรอบ — ต้องตรงกับ STROLL_ACTS ใน firmware/main/ct_ui.c
+# ท่าที่หยุดทำกลางทาง วนไปตามรอบ — ต้องตรงกับ STROLL_ACTS ใน firmware/main/pch_ui.c
 STROLL_ACTS = ("celebrate", "thinking", "searching", "waiting")
 # ตำแหน่งหยุดเป็นสัดส่วนของเส้นทาง — วนคนละความยาวกับ ACTS เพื่อไม่ให้จับคู่ซ้ำ
 STROLL_PAUSE_AT = (0.34, 0.5, 0.66)
@@ -288,7 +288,7 @@ def stroll_pose(t: float) -> tuple[str, float]:
     """เวลาสัมบูรณ์ (วินาที) -> (state, x ของขอบซ้ายกรอบวาด)
 
     เที่ยวหนึ่ง = เดินจากนอกจอซ้ายไปนอกจอขวา โดยหยุดทำท่าหนึ่งครั้งกลางทาง
-    ต้องตรงกับ stroll_pose ใน firmware/main/ct_ui.c
+    ต้องตรงกับ stroll_pose ใน firmware/main/pch_ui.c
     """
     walk_s = STROLL_TRAVEL / L.stroll.speed_px_s
     trip_s = walk_s + L.stroll.pause_s
@@ -357,7 +357,7 @@ def fmt_remaining(secs: int | None, terse: bool = False) -> str:
     ระดับความละเอียดลดลงตามระยะ: ใกล้ = นาที, ไกล = ชั่วโมง/วัน
     ที่ 0 ไม่ใช่ "0m" แต่เป็น "reset" เพราะ % ที่ถืออยู่หมดอายุไปแล้ว
 
-    ต้องตรงกับ usage_reset_text ใน firmware/main/ct_ui.c ทุกตัวอักษร รวมช่องว่าง
+    ต้องตรงกับ usage_reset_text ใน firmware/main/pch_ui.c ทุกตัวอักษร รวมช่องว่าง
 
     `terse` = ตัดหน่วยเล็กทิ้ง ใช้ตอนที่ยาวเต็มใส่ไม่ลง — "4d" ยังตอบว่าอีกนานไหม
     ส่วน "4d…" ตอบไม่ได้อะไรเลยนอกจากบอกว่าจอแคบ
@@ -390,7 +390,7 @@ def usage_bar_color(u: Usage) -> str:
     """แดงทันทีที่ใช้เร็วกว่าเวลาที่ผ่านไปในหน้าต่าง ไม่ต้องรอถึงเกณฑ์ %
 
     "60% ตอนเหลือเวลาอีกครึ่ง" เป็นปัญหาคนละแบบกับ "60% ตอนหมดเวลาพอดี"
-    ต้องตรงกับ usage_bar_color ใน firmware/main/ct_ui.c
+    ต้องตรงกับ usage_bar_color ใน firmware/main/pch_ui.c
     และ MenuBadge.alarming ใน host/Sources/PerchCore/MenuBadge.swift (แถบเมนูใช้สูตร pace เดียวกัน แต่ไม่มีเกณฑ์ %)
     """
     if u.pct is None:
@@ -403,7 +403,7 @@ def usage_bar_color(u: Usage) -> str:
 
 
 # ขอบซ้าย/ขวาของแผง และขนาดของหนึ่งช่องในตาราง
-# ต้องตรงกับ USAGE_X0/USAGE_CELL_W/USAGE_PILL_W ใน firmware/main/ct_ui.c
+# ต้องตรงกับ USAGE_X0/USAGE_CELL_W/USAGE_PILL_W ใน firmware/main/pch_ui.c
 USAGE_X0 = L.card.pad + 8
 USAGE_X1 = L.screen.width - L.card.pad - 8
 USAGE_W = USAGE_X1 - USAGE_X0
@@ -417,7 +417,7 @@ _PILL_COLORS = {"Current": PAL.clay, "Weekly": PAL.good, "Codex": PAL.codex}
 
 def _usage_row(draw: ImageDraw.ImageDraw, u: Usage, y: int, x0: int, x1: int) -> None:
     """หนึ่งช่องของตาราง — ผู้เรียกเป็นคนบอกขอบซ้าย/ขวา ไม่ใช่กินเต็มจอ
-    ต้องตรงกับ build_usage/layout_usage ใน firmware/main/ct_ui.c"""
+    ต้องตรงกับ build_usage/layout_usage ใน firmware/main/pch_ui.c"""
     col = usage_bar_color(u)
 
     # เปอร์เซ็นต์ตัวใหญ่ — สิ่งเดียวที่ต้องอ่านออกจากอีกฝั่งห้อง
@@ -484,7 +484,7 @@ def _usage(draw: ImageDraw.ImageDraw, rows: list[Usage]) -> None:
 
     แผงเตี้ยกว่าพื้นที่ที่มี จึงจัดกลางแนวตั้ง ไม่ชิดบน ไม่งั้นก้นจอโล่งเป็นแถบ
     แล้วอ่านเป็น "ของหาย" แทนที่จะเป็นการตัดสินใจ
-    ต้องตรงกับ usage_row_y/usage_cell_x ใน firmware/main/ct_ui.c
+    ต้องตรงกับ usage_row_y/usage_cell_x ใน firmware/main/pch_ui.c
     """
     grid_rows = (L.usage.rows + L.usage.cols - 1) // L.usage.cols
     block = grid_rows * L.usage.row_h + (grid_rows - 1) * L.usage.gap
@@ -495,7 +495,7 @@ def _usage(draw: ImageDraw.ImageDraw, rows: list[Usage]) -> None:
         _usage_row(draw, u, y, x0, x0 + USAGE_CELL_W)
 
 
-# ต้องตรงกับ build_machine/layout_machine ใน firmware/main/ct_ui.c
+# ต้องตรงกับ build_machine/layout_machine ใน firmware/main/pch_ui.c
 MACHINE_LINE_H = 18
 MACHINE_BAR_H = 4
 MACHINE_LABEL_W = 30

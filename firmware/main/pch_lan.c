@@ -1,8 +1,8 @@
-#include "ct_lan.h"
+#include "pch_lan.h"
 
 #include <string.h>
 
-#include "ct_ble.h"
+#include "pch_ble.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -40,11 +40,11 @@ static const char *TAG = "lan";
 static const uint8_t GREETING_MAGIC[4] = {'T', 'A', 'M', 'A'};
 #define GREETING_VERSION 1
 
-static ct_lan_frame_cb_t s_cb;
+static pch_lan_frame_cb_t s_cb;
 
 // กุญแจถูกเปลี่ยนจากเธรด BLE ระหว่างที่เธรดนี้อาจกำลังถอดรหัสอยู่
 static SemaphoreHandle_t s_key_lock;
-static uint8_t s_key[CT_LAN_KEY_BYTES];
+static uint8_t s_key[PCH_LAN_KEY_BYTES];
 static bool s_has_key;
 static char s_fp[9];
 
@@ -200,16 +200,16 @@ static bool open_listen(void)
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
     struct sockaddr_in addr = {
         .sin_family = AF_INET,
-        .sin_port = htons(CT_LAN_PORT),
+        .sin_port = htons(PCH_LAN_PORT),
         .sin_addr = {.s_addr = htonl(INADDR_ANY)},
     };
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0 || listen(fd, 1) != 0) {
-        ESP_LOGE(TAG, "cannot listen on %d: errno %d", CT_LAN_PORT, errno);
+        ESP_LOGE(TAG, "cannot listen on %d: errno %d", PCH_LAN_PORT, errno);
         close(fd);
         return false;
     }
     s_listen = fd;
-    ESP_LOGI(TAG, "listening on port %d", CT_LAN_PORT);
+    ESP_LOGI(TAG, "listening on port %d", PCH_LAN_PORT);
     return true;
 }
 
@@ -294,10 +294,10 @@ static void announce(void)
         ESP_LOGW(TAG, "mdns init failed — the mac will need the address typed in");
         return;
     }
-    const char *name = ct_ble_name();
+    const char *name = pch_ble_name();
     mdns_hostname_set(name);
     mdns_instance_name_set(name);
-    if (mdns_service_add(NULL, "_perch", "_tcp", CT_LAN_PORT, NULL, 0) != ESP_OK) {
+    if (mdns_service_add(NULL, "_perch", "_tcp", PCH_LAN_PORT, NULL, 0) != ESP_OK) {
         ESP_LOGW(TAG, "mdns service failed");
         return;
     }
@@ -306,7 +306,7 @@ static void announce(void)
 }
 
 // --- API -----------------------------------------------------------------------
-void ct_lan_init(ct_lan_frame_cb_t on_frame)
+void pch_lan_init(pch_lan_frame_cb_t on_frame)
 {
     s_cb = on_frame;
     s_key_lock = xSemaphoreCreateMutex();
@@ -314,7 +314,7 @@ void ct_lan_init(ct_lan_frame_cb_t on_frame)
     fingerprint();
     ESP_LOGI(TAG, "key %s, counter starts at %llu", s_has_key ? s_fp : "not set",
              (unsigned long long)s_seen);
-    xTaskCreate(lan_task, "ct_lan", 4096, NULL, 4, NULL);
+    xTaskCreate(lan_task, "pch_lan", 4096, NULL, 4, NULL);
 }
 
 static int hex_nibble(char c)
@@ -325,11 +325,11 @@ static int hex_nibble(char c)
     return -1;
 }
 
-bool ct_lan_set_key(const char *hex)
+bool pch_lan_set_key(const char *hex)
 {
-    if (!hex || strlen(hex) != CT_LAN_KEY_BYTES * 2) return false;
-    uint8_t key[CT_LAN_KEY_BYTES];
-    for (int i = 0; i < CT_LAN_KEY_BYTES; i++) {
+    if (!hex || strlen(hex) != PCH_LAN_KEY_BYTES * 2) return false;
+    uint8_t key[PCH_LAN_KEY_BYTES];
+    for (int i = 0; i < PCH_LAN_KEY_BYTES; i++) {
         int hi = hex_nibble(hex[i * 2]), lo = hex_nibble(hex[i * 2 + 1]);
         if (hi < 0 || lo < 0) return false;
         key[i] = (uint8_t)((hi << 4) | lo);
@@ -359,14 +359,14 @@ bool ct_lan_set_key(const char *hex)
     return true;
 }
 
-const char *ct_lan_key_fingerprint(void) { return s_fp; }
+const char *pch_lan_key_fingerprint(void) { return s_fp; }
 
-void ct_lan_set_up(bool up, const char *ip)
+void pch_lan_set_up(bool up, const char *ip)
 {
     s_up = up;
     if (!up) return;
-    ESP_LOGI(TAG, "reachable at %s:%d", ip ? ip : "?", CT_LAN_PORT);
+    ESP_LOGI(TAG, "reachable at %s:%d", ip ? ip : "?", PCH_LAN_PORT);
     announce();
 }
 
-bool ct_lan_client_connected(void) { return s_client >= 0; }
+bool pch_lan_client_connected(void) { return s_client >= 0; }

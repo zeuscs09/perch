@@ -1,7 +1,7 @@
-#include "ct_dim.h"
+#include "pch_dim.h"
 
-#include "ct_lcd.h"
-#include "ct_touch.h"
+#include "pch_lcd.h"
+#include "pch_touch.h"
 #include "esp_log.h"
 
 // ไม่มีใครแตะนานเท่านี้ = ไม่มีใครอยู่
@@ -49,26 +49,26 @@ static void apply(int percent)
     if (percent == s_user && s_shown < s_user) ESP_LOGI("dim", "สว่างเต็ม %d%%", percent);
     if (percent == dim_level() && s_shown > percent) ESP_LOGI("dim", "หรี่เหลือ %d%%", percent);
     s_shown = percent;
-    ct_lcd_set_backlight(percent);
+    pch_lcd_set_backlight(percent);
 }
 
-void ct_dim_init(void)
+void pch_dim_init(void)
 {
-    s_shown = ct_lcd_backlight();
+    s_shown = pch_lcd_backlight();
     s_user = s_shown;
     s_idle_ms = 0;
 }
 
-void ct_dim_set_user(int percent)
+void pch_dim_set_user(int percent)
 {
     if (percent < 0) percent = 0;
     if (percent > 100) percent = 100;
     s_user = percent;
     // ผู้ใช้เพิ่งลากแถบความสว่าง = ผู้ใช้กำลังมองจออยู่แน่นอน
-    ct_dim_wake();
+    pch_dim_wake();
 }
 
-void ct_dim_wake(void)
+void pch_dim_wake(void)
 {
     s_idle_ms = 0;
     apply(s_user);  // ทันที ไม่ไล่ขึ้น — คนที่เพิ่งแตะจอกำลังรอดูอยู่
@@ -88,14 +88,14 @@ static void fade_to(int target, int elapsed_ms)
     apply(next);
 }
 
-void ct_dim_set_night(bool on)
+void pch_dim_set_night(bool on)
 {
     if (on == s_night) return;
     s_night = on;
-    if (!on) ct_dim_wake();  // เช้าแล้ว สว่างกลับทันที ไม่ต้องรอให้ใครมาแตะ
+    if (!on) pch_dim_wake();  // เช้าแล้ว สว่างกลับทันที ไม่ต้องรอให้ใครมาแตะ
 }
 
-void ct_dim_tick(int elapsed_ms)
+void pch_dim_tick(int elapsed_ms)
 {
     // กลางคืนไม่ต้องรอให้เห็นการแตะก่อน ต่างจากการหรี่ปกติ เพราะมันมีทางออกที่ไม่ขึ้นกับ
     // ฮาร์ดแวร์อยู่แล้ว: เจ็ดโมงเช้าจอสว่างกลับเอง ต่อให้แตะไม่ติดเลยก็ไม่มีวันค้างมืด
@@ -104,7 +104,7 @@ void ct_dim_tick(int elapsed_ms)
         return;
     }
     // อย่าดับสิ่งที่ตัวเองเปิดคืนไม่ได้ — จนกว่าจะเห็นการแตะติดสักครั้ง จอสว่างเต็มไว้ก่อน
-    if (!ct_touch_seen()) {
+    if (!pch_touch_seen()) {
         apply(s_user);
         return;
     }

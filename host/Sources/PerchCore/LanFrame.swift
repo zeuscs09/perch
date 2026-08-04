@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-/// ข้อตกลงบนสาย LAN — ต้องตรงกับ `firmware/main/ct_lan.c` ทุกไบต์
+/// ข้อตกลงบนสาย LAN — ต้องตรงกับ `firmware/main/pch_lan.c` ทุกไบต์
 ///
 ///     [4B len BE][12B nonce][ciphertext][16B tag]
 ///

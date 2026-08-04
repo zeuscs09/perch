@@ -5,17 +5,17 @@
 #include <string.h>
 
 #include "cJSON.h"
-#include "ct_ble.h"
-#include "ct_lan.h"
-#include "ct_lcd.h"
-#include "ct_dim.h"
-#include "ct_led.h"
-#include "ct_night.h"
-#include "ct_touch.h"
-#include "ct_mascot.h"
-#include "ct_model.h"
-#include "ct_ui.h"
-#include "ct_wifi.h"
+#include "pch_ble.h"
+#include "pch_lan.h"
+#include "pch_lcd.h"
+#include "pch_dim.h"
+#include "pch_led.h"
+#include "pch_night.h"
+#include "pch_touch.h"
+#include "pch_mascot.h"
+#include "pch_model.h"
+#include "pch_ui.h"
+#include "pch_wifi.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_timer.h"
@@ -31,13 +31,13 @@ static const char *TAG = "main";
 // บัฟเฟอร์วาดของ LVGL: 1/10 ของจอสองก้อน (~15KB) ไม่ใช่ framebuffer เต็ม 150KB
 // บอร์ดนี้ไม่มี PSRAM จึงไม่มีทางเลือกอื่นอยู่แล้ว
 #define DRAW_LINES 24
-#define DRAW_BUF_PX (CT_SCREEN_WIDTH * DRAW_LINES)
+#define DRAW_BUF_PX (PCH_SCREEN_WIDTH * DRAW_LINES)
 
 static lv_color_t *s_buf1, *s_buf2;
 static SemaphoreHandle_t s_lock;
 
 // ของที่ BLE ฝากไว้ให้ลูปหลักหยิบไปใช้
-static ct_snapshot_t s_pending;
+static pch_snapshot_t s_pending;
 static bool s_has_pending;
 static bool s_link;
 static bool s_link_changed = true;
@@ -52,15 +52,15 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
     size_t px = (size_t)(area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1);
     // LVGL เก็บ RGB565 แบบ little-endian ส่วนจอกินแบบ big-endian
     lv_draw_sw_rgb565_swap(px_map, px);
-    ct_lcd_blit(area->x1, area->y1, area->x2, area->y2, px_map, px * 2);
+    pch_lcd_blit(area->x1, area->y1, area->x2, area->y2, px_map, px * 2);
     lv_display_flush_ready(disp);
 }
 
 // --- callback จาก NimBLE (คนละเธรดกับ LVGL) ---------------------------------
 static void on_state(const char *json, int len)
 {
-    ct_snapshot_t parsed;
-    if (!ct_model_parse(json, len, &parsed)) {
+    pch_snapshot_t parsed;
+    if (!pch_model_parse(json, len, &parsed)) {
         ESP_LOGW(TAG, "snapshot was not valid json");
         return;
     }
@@ -73,7 +73,7 @@ static void on_state(const char *json, int len)
 }
 
 // กุญแจของทาง LAN เดินมาช่องเดียวกับรหัส WiFi ด้วยเหตุผลเดียวกัน (ต้องเข้ารหัส) แต่
-// เจ้าของคนละโมดูล — แยกออกมาที่นี่แทนที่จะยัดเข้า `ct_wifi_command` เพื่อไม่ให้โมดูล
+// เจ้าของคนละโมดูล — แยกออกมาที่นี่แทนที่จะยัดเข้า `pch_wifi_command` เพื่อไม่ให้โมดูล
 // WiFi ต้องรู้จักเรื่องการปิดผนึกเฟรม ซึ่งเป็นคนละชั้นกัน
 static bool lan_command(const char *json, int len)
 {
@@ -82,22 +82,22 @@ static bool lan_command(const char *json, int len)
     const cJSON *cmd = cJSON_GetObjectItem(root, "c");
     const cJSON *key = cJSON_GetObjectItem(root, "k");
     bool mine = cJSON_IsString(cmd) && strcmp(cmd->valuestring, "key") == 0;
-    if (mine && !ct_lan_set_key(cJSON_IsString(key) ? key->valuestring : NULL)) {
+    if (mine && !pch_lan_set_key(cJSON_IsString(key) ? key->valuestring : NULL)) {
         ESP_LOGW(TAG, "lan key rejected");
     }
     cJSON_Delete(root);
     // ตอบกลับด้วยสถานะเต็มใบ ไม่ใช่ ack เปล่า — Mac ต้องเห็นลายนิ้วมือใหม่เพื่อรู้ว่า
     // กุญแจที่มันเพิ่งส่งไปคือกุญแจที่บอร์ดถืออยู่จริง
-    if (mine) ct_wifi_report();
+    if (mine) pch_wifi_report();
     return mine;
 }
 
 static void on_config(const char *json, int len)
 {
     // คำสั่ง WiFi มาทางเดียวกับความสว่าง แยกด้วยคีย์ "c" — ช่องนี้บังคับเข้ารหัสอยู่แล้ว
-    // เพราะรหัส WiFi ต้องผ่านมันไป (ct_ble.h)
+    // เพราะรหัส WiFi ต้องผ่านมันไป (pch_ble.h)
     if (lan_command(json, len)) return;
-    if (ct_wifi_command(json, len)) return;
+    if (pch_wifi_command(json, len)) return;
 
     // คอนฟิกที่เหลือมีค่าเดียว: {"b":0..100}
     const char *p = strstr(json, "\"b\"");
@@ -126,7 +126,7 @@ static void notify_json(cJSON *root)
     char *text = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     if (!text) return;
-    ct_ble_notify(text, (int)strlen(text));
+    pch_ble_notify(text, (int)strlen(text));
     cJSON_free(text);
 }
 
@@ -149,20 +149,20 @@ static void on_ap_end(void)
     notify_json(root);
 }
 
-static const char *wifi_state_name(ct_wifi_state_t st)
+static const char *wifi_state_name(pch_wifi_state_t st)
 {
     switch (st) {
-        case CT_WIFI_CONNECTING: return "connecting";
-        case CT_WIFI_CONNECTED: return "connected";
-        case CT_WIFI_FAILED: return "failed";
+        case PCH_WIFI_CONNECTING: return "connecting";
+        case PCH_WIFI_CONNECTED: return "connected";
+        case PCH_WIFI_FAILED: return "failed";
         default: return "off";
     }
 }
 
-static void on_wifi_status(ct_wifi_state_t st, const char *ssid, const char *ip,
+static void on_wifi_status(pch_wifi_state_t st, const char *ssid, const char *ip,
                            const char *err)
 {
-    bool up = (st == CT_WIFI_CONNECTED);
+    bool up = (st == PCH_WIFI_CONNECTED);
     xSemaphoreTake(s_lock, portMAX_DELAY);
     s_wifi_up = up;
     snprintf(s_ip, sizeof(s_ip), "%s", up && ip ? ip : "");
@@ -171,7 +171,7 @@ static void on_wifi_status(ct_wifi_state_t st, const char *ssid, const char *ip,
 
     // server ขึ้นตามการมี IP ไม่ใช่ตามการมีกุญแจ — บอร์ดที่รับสายแล้วปฏิเสธทุกเฟรม
     // บอกฝั่ง Mac ได้ว่า "กุญแจไม่ตรง" ส่วนบอร์ดที่ไม่รับสายเลยแยกไม่ออกจากบอร์ดที่ตาย
-    ct_lan_set_up(up, ip);
+    pch_lan_set_up(up, ip);
 
     cJSON *root = cJSON_CreateObject();
     if (!root) return;
@@ -180,13 +180,13 @@ static void on_wifi_status(ct_wifi_state_t st, const char *ssid, const char *ip,
     cJSON_AddStringToObject(root, "s", ssid ? ssid : "");
     cJSON_AddStringToObject(root, "ip", ip ? ip : "");
     // ลายนิ้วมือกุญแจ LAN — ว่างแปลว่ายังไม่เคยตั้ง Mac จะได้รู้ว่าต้องส่งไปให้
-    cJSON_AddStringToObject(root, "kf", ct_lan_key_fingerprint());
+    cJSON_AddStringToObject(root, "kf", pch_lan_key_fingerprint());
     if (err && err[0]) cJSON_AddStringToObject(root, "er", err);
 
     // รายชื่อที่จำไว้เดินทางมากับสถานะ ไม่ใช่คำสั่งแยก — หน้าตั้งค่าต้องการทั้งคู่พร้อมกัน
     // เสมอ และสองข้อความที่มาไม่พร้อมกันแปลว่ามีจังหวะที่หน้าจอแสดงของครึ่งเดียว
-    char saved[CT_WIFI_MAX_NETS][CT_WIFI_SSID_CAP];
-    int n = ct_wifi_saved(saved, CT_WIFI_MAX_NETS);
+    char saved[PCH_WIFI_MAX_NETS][PCH_WIFI_SSID_CAP];
+    int n = pch_wifi_saved(saved, PCH_WIFI_MAX_NETS);
     cJSON *list = cJSON_AddArrayToObject(root, "nets");
     for (int i = 0; list && i < n; i++) {
         cJSON_AddItemToArray(list, cJSON_CreateString(saved[i]));
@@ -198,7 +198,7 @@ static void on_wifi_status(ct_wifi_state_t st, const char *ssid, const char *ip,
 
 static void apply_pending(void)
 {
-    ct_snapshot_t snap;
+    pch_snapshot_t snap;
     char ip[sizeof(s_ip)];
     bool got_snapshot = false, link = false, link_changed = false, wifi = false;
     int backlight = -1;
@@ -221,7 +221,7 @@ static void apply_pending(void)
     // ทาง LAN ไม่มี callback บอกว่ามีใครต่อเข้ามา — ถามเอาตรงนี้ ลูปนี้เดินทุก 10 ms
     // อยู่แล้วและคำตอบคือการอ่านตัวแปรตัวเดียว ถูกกว่าการลากสัญญาณข้ามสองเธรด
     static bool last_lan = false;
-    bool lan = ct_lan_client_connected();
+    bool lan = pch_lan_client_connected();
     if (lan != last_lan) {
         last_lan = lan;
         link_changed = true;
@@ -230,32 +230,32 @@ static void apply_pending(void)
     if (link_changed) {
         // "สด" คือมีใครสักคนป้อน snapshot อยู่ ไม่ว่าจะทางไหน — จอที่ซ่อนการ์ดทิ้งทั้งที่
         // ข้อมูลกำลังไหลเข้ามาทาง LAN คือจอที่โกหกในทางกลับกัน
-        ct_ui_set_connected(link || lan);
-        ct_ui_set_link(link, wifi, ip);
+        pch_ui_set_connected(link || lan);
+        pch_ui_set_link(link, wifi, ip);
     }
     if (got_snapshot) {
         // เวลาบนบอร์ดมาจาก snapshot ที่เดียว — บอร์ดไม่มีนาฬิกาจริงของตัวเอง
         // ต้องตั้งก่อนเรียกอย่างอื่น เพราะโหมดกลางคืนตัดสินจากมัน
-        ct_night_set_clock(snap.clock);
+        pch_night_set_clock(snap.clock);
         // ไฟอ่านสถานะรวมจาก snapshot เดียวกับที่จอวาด — ไม่ใช่แค่กะพริบตอนมีการเตือนใหม่
         // เพราะคำถามที่ไฟตอบคือ "ตอนนี้ต้องลุกไปทำอะไรไหม" ซึ่งเป็นสภาพต่อเนื่อง
         // ไม่ใช่เหตุการณ์ที่เกิดแล้วผ่านไป
-        ct_led_apply(&snap, link || lan);
-        ct_ui_set_snapshot(&snap);
+        pch_led_apply(&snap, link || lan);
+        pch_ui_set_snapshot(&snap);
     }
-    if (backlight >= 0) ct_dim_set_user(backlight);
+    if (backlight >= 0) pch_dim_set_user(backlight);
 }
 
 // กระจายสถานะกลางคืนไปให้ทุกคนที่ต้องรู้ — เรียกทุกรอบ แต่ละตัวกันซ้ำเอง
 //
-// อยู่ตรงนี้ไม่ใช่ใน ct_night เพราะ ct_night ตอบคำถามเดียวคือ "ตอนนี้กลางคืนไหม"
+// อยู่ตรงนี้ไม่ใช่ใน pch_night เพราะ pch_night ตอบคำถามเดียวคือ "ตอนนี้กลางคืนไหม"
 // ส่วนใครต้องทำอะไรกับคำตอบนั้นเป็นเรื่องของการต่อสาย ซึ่งเป็นงานของไฟล์นี้
 static void apply_night(void)
 {
-    bool night = ct_night_active();
-    ct_ui_set_night(night);
-    ct_led_set_night(night);
-    ct_dim_set_night(night);
+    bool night = pch_night_active();
+    pch_ui_set_night(night);
+    pch_led_set_night(night);
+    pch_dim_set_night(night);
 }
 
 void app_main(void)
@@ -268,11 +268,11 @@ void app_main(void)
     ESP_ERROR_CHECK(err);
 
     s_lock = xSemaphoreCreateMutex();
-    ct_mascot_init();
-    ct_lcd_init();
-    ct_led_init();
-    ct_touch_init();
-    ct_dim_init();
+    pch_mascot_init();
+    pch_lcd_init();
+    pch_led_init();
+    pch_touch_init();
+    pch_dim_init();
 
     lv_init();
     lv_tick_set_cb(millis_cb);
@@ -281,32 +281,32 @@ void app_main(void)
     s_buf2 = heap_caps_malloc(DRAW_BUF_PX * sizeof(lv_color_t), MALLOC_CAP_DMA);
     assert(s_buf1 && s_buf2);
 
-    lv_display_t *disp = lv_display_create(CT_SCREEN_WIDTH, CT_SCREEN_HEIGHT);
+    lv_display_t *disp = lv_display_create(PCH_SCREEN_WIDTH, PCH_SCREEN_HEIGHT);
     lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
     lv_display_set_flush_cb(disp, flush_cb);
     lv_display_set_buffers(disp, s_buf1, s_buf2, DRAW_BUF_PX * sizeof(lv_color_t),
                            LV_DISPLAY_RENDER_MODE_PARTIAL);
 
-    ct_ui_init();
-    ct_ui_set_connected(false);
-    ct_ui_set_link(false, false, NULL);
+    pch_ui_init();
+    pch_ui_set_connected(false);
+    pch_ui_set_link(false, false, NULL);
 
-    ct_ble_cbs_t cbs = {
+    pch_ble_cbs_t cbs = {
         .on_state = on_state,
         .on_config = on_config,
         .on_link = on_link,
     };
-    ct_ble_init(&cbs);
+    pch_ble_init(&cbs);
 
     // WiFi ตามหลัง BLE เสมอ: ทางหลักต้องขึ้นก่อน และผลสแกนต้องมีปลายทางให้ส่งไปแล้ว
-    ct_wifi_cbs_t wifi_cbs = {
+    pch_wifi_cbs_t wifi_cbs = {
         .on_ap = on_ap,
         .on_ap_end = on_ap_end,
         .on_status = on_wifi_status,
     };
-    ct_wifi_init(&wifi_cbs);
+    pch_wifi_init(&wifi_cbs);
     // snapshot ที่มาทาง LAN เข้าประตูเดียวกับที่มาทาง BLE — สองทางเดิน ปลายทางเดียว
-    ct_lan_init(on_state);
+    pch_lan_init(on_state);
     ESP_LOGI(TAG, "ready");
 
     const int step_ms = 10;
@@ -316,20 +316,20 @@ void app_main(void)
         apply_pending();
         // อ่านการแตะทุกรอบ ไม่ใช่ทุกเฟรม — นิ้วที่แตะแล้วยกภายในเฟรมเดียวจะหายไป
         // ถ้ารอถึงจังหวะวาด และการอ่านขาหนึ่งขาถูกกว่าการวาดจอมาก
-        if (ct_touch_tapped(step_ms)) {
+        if (pch_touch_tapped(step_ms)) {
             // นิ้วเดียวตอบทุกอย่างที่คนที่เพิ่งเดินมาถึงอยากได้พร้อมกัน:
             // เห็นจอชัด ออกจากโหมดกลางคืน และเห็นว่าโควตาเหลือเท่าไร
-            ct_night_wake();
-            ct_dim_wake();
-            ct_ui_peek_usage();
+            pch_night_wake();
+            pch_dim_wake();
+            pch_ui_peek_usage();
         }
-        ct_night_tick(step_ms);
+        pch_night_tick(step_ms);
         apply_night();
-        ct_dim_tick(step_ms);
+        pch_dim_tick(step_ms);
         since_frame += step_ms;
         if (since_frame >= 60) {  // ~16 เฟรมต่อวินาที พอสำหรับอนิเมชันบล็อกสี่เหลี่ยม
-            ct_ui_tick();
-            ct_led_tick(since_frame);
+            pch_ui_tick();
+            pch_led_tick(since_frame);
             since_frame = 0;
         }
         // DRAM static เหลือ ~24KB เท่านั้น (idf.py size) ทาง LAN กับ mDNS เป็นสองตัวที่กิน

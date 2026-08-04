@@ -10,20 +10,20 @@
 
 #include <stdbool.h>
 
-#include "ct_model.h"
+#include "pch_model.h"
 
-void ct_led_init(void);
+void pch_led_init(void);
 
 // กลางคืน = ดับสนิท ไม่ว่าสถานะจะเป็นอะไร
 //
 // เหตุผลที่ไฟดวงนี้มีอยู่คือ "บอกว่ามีคนรอเราตอบ" ซึ่งเป็นข้อความที่ส่งถึงคนที่ทำงานอยู่
 // คนที่นอนอยู่ข้างๆ ไม่ได้เป็นผู้รับ ไฟส้มที่เต้นทุก 1.4 วินาทีข้างหัวเตียงจึงไม่ใช่
 // สัญญาณอีกต่อไป มันคือสิ่งรบกวน
-void ct_led_set_night(bool on);
+void pch_led_set_night(bool on);
 
 // บอกไฟว่าภาพรวมตอนนี้เป็นยังไง — เรียกทุกครั้งที่ snapshot เปลี่ยน
 // ไม่ต่อลิงก์ = ดับ (ไฟที่ยังสวยอยู่ตอนขาดการติดต่อคือการโกหก)
-void ct_led_apply(const ct_snapshot_t *snap, bool connected);
+void pch_led_apply(const pch_snapshot_t *snap, bool connected);
 
 // เดินจังหวะหายใจ เรียกจากลูปหลักพร้อมเวลาที่ผ่านไป (ms)
-void ct_led_tick(int elapsed_ms);
+void pch_led_tick(int elapsed_ms);

@@ -8,7 +8,7 @@
 ตกลงไปอยู่บนพื้นดินใต้เท้า
 
 เวลามาจาก `snapshot.clock` ที่มีอยู่แล้ว ไม่มีอะไรเพิ่มบนสาย BLE — ต้องตรงกับ
-ฝั่ง firmware ใน `firmware/main/ct_ui.c`
+ฝั่ง firmware ใน `firmware/main/pch_ui.c`
 """
 
 from __future__ import annotations
@@ -174,7 +174,7 @@ def _draw_clouds(draw: ImageDraw.ImageDraw, phase: str, t: float,
     clouds = list(L.sky.clouds)
     if covered:
         # ก้อนเดิม 3 ก้อนดูโล่งเกินกว่าจะอ่านว่าฟ้าปิด — เติมให้ครบตาม overcast_clouds
-        # หาตำแหน่งจากดัชนีเอง (ตรงกับ draw_clouds ใน ct_ui.c)
+        # หาตำแหน่งจากดัชนีเอง (ตรงกับ draw_clouds ใน pch_ui.c)
         for i in range(len(L.sky.clouds), L.weather.overcast_clouds):
             clouds.append([(i * 83 + 29) % L.screen.width,
                            34 + (i * 17) % 46,
@@ -211,7 +211,7 @@ def _draw_grass(draw_ctx: ImageDraw.ImageDraw, phase: str) -> None:
 
 # --- สภาพอากาศ -------------------------------------------------------------
 # อากาศเป็น "อีกแกน" ของท้องฟ้า ไม่ใช่ phase ใหม่: เวลาของวันยังคุมความสว่างพื้นฐาน
-# ส่วนอากาศคุมว่ามีอะไรบังฟ้าอยู่ ต้องตรงกับ weather_* ใน firmware/main/ct_ui.c
+# ส่วนอากาศคุมว่ามีอะไรบังฟ้าอยู่ ต้องตรงกับ weather_* ใน firmware/main/pch_ui.c
 
 WET = ("rain", "storm")
 

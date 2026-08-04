@@ -1,4 +1,4 @@
-#include "ct_wifi.h"
+#include "pch_wifi.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -18,8 +18,8 @@ static const char *TAG = "wifi";
 // เก็บทีละก้อนต่อเครือข่าย ไม่ใช่ key แยก ssid/psk — การเขียนสองครั้งเปิดช่องให้
 // ไฟดับคาแล้วเหลือ ssid ที่ไม่มีรหัส ซึ่งลูปต่อไม่ติดตลอดโดยไม่มีใครบอกว่าทำไม
 typedef struct {
-    char ssid[CT_WIFI_SSID_CAP];
-    char psk[CT_WIFI_PSK_CAP];
+    char ssid[PCH_WIFI_SSID_CAP];
+    char psk[PCH_WIFI_PSK_CAP];
 } net_t;
 
 #define NVS_NS "tamawifi"
@@ -43,12 +43,12 @@ static void copy_str(char *dst, size_t cap, const char *src)
     dst[i] = '\0';
 }
 
-static ct_wifi_cbs_t s_cbs;
-static net_t s_nets[CT_WIFI_MAX_NETS];
+static pch_wifi_cbs_t s_cbs;
+static net_t s_nets[PCH_WIFI_MAX_NETS];
 static int s_net_count;
 
-static ct_wifi_state_t s_state = CT_WIFI_OFF;
-static char s_ssid[CT_WIFI_SSID_CAP];
+static pch_wifi_state_t s_state = PCH_WIFI_OFF;
+static char s_ssid[PCH_WIFI_SSID_CAP];
 static char s_ip[16];
 static char s_err[24];
 
@@ -65,11 +65,11 @@ static void report(void)
     if (s_cbs.on_status) s_cbs.on_status(s_state, s_ssid, s_ip, s_err);
 }
 
-static void set_state(ct_wifi_state_t st, const char *err)
+static void set_state(pch_wifi_state_t st, const char *err)
 {
     s_state = st;
     copy_str(s_err, sizeof(s_err), err);
-    if (st != CT_WIFI_CONNECTED) s_ip[0] = '\0';
+    if (st != PCH_WIFI_CONNECTED) s_ip[0] = '\0';
     report();
 }
 
@@ -78,7 +78,7 @@ static void nets_load(void)
 {
     nvs_handle_t h;
     if (nvs_open(NVS_NS, NVS_READONLY, &h) != ESP_OK) return;
-    for (int i = 0; i < CT_WIFI_MAX_NETS; i++) {
+    for (int i = 0; i < PCH_WIFI_MAX_NETS; i++) {
         char key[8];
         snprintf(key, sizeof(key), "n%d", i);
         size_t len = sizeof(net_t);
@@ -95,7 +95,7 @@ static void nets_store(void)
 {
     nvs_handle_t h;
     if (nvs_open(NVS_NS, NVS_READWRITE, &h) != ESP_OK) return;
-    for (int i = 0; i < CT_WIFI_MAX_NETS; i++) {
+    for (int i = 0; i < PCH_WIFI_MAX_NETS; i++) {
         char key[8];
         snprintf(key, sizeof(key), "n%d", i);
         if (i < s_net_count) {
@@ -124,8 +124,8 @@ static void net_remember(const char *ssid, const char *psk)
     } else {
         // เต็มแล้วให้ตัวเก่าสุดหลุดออก ไม่ใช่ปฏิเสธตัวใหม่ — ผู้ใช้ที่กำลังยืนอยู่หน้า
         // เครือข่ายใหม่ต้องการตัวนี้ ส่วนตัวที่จำไว้ตั้งแต่ปีที่แล้วไม่มีใครคิดถึง
-        if (s_net_count == CT_WIFI_MAX_NETS) {
-            memmove(&s_nets[0], &s_nets[1], sizeof(net_t) * (CT_WIFI_MAX_NETS - 1));
+        if (s_net_count == PCH_WIFI_MAX_NETS) {
+            memmove(&s_nets[0], &s_nets[1], sizeof(net_t) * (PCH_WIFI_MAX_NETS - 1));
             s_net_count--;
         }
         net_t *n = &s_nets[s_net_count++];
@@ -144,14 +144,14 @@ static void connect_to(const net_t *n)
     cfg.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
     esp_wifi_set_config(WIFI_IF_STA, &cfg);
     copy_str(s_ssid, sizeof(s_ssid), n->ssid);
-    set_state(CT_WIFI_CONNECTING, NULL);
+    set_state(PCH_WIFI_CONNECTING, NULL);
     esp_wifi_connect();
 }
 
 static void search(void)
 {
     if (s_net_count == 0) {
-        set_state(CT_WIFI_OFF, NULL);
+        set_state(PCH_WIFI_OFF, NULL);
         return;
     }
     // สแกนก่อนต่อเสมอ แม้จะจำเครือข่ายเดียว — เลือกตัวที่แรงที่สุดในบรรดาที่จำไว้
@@ -159,7 +159,7 @@ static void search(void)
     s_scan = SCAN_PICK;
     if (esp_wifi_scan_start(NULL, false) != ESP_OK) {
         s_scan = SCAN_NONE;
-        set_state(CT_WIFI_FAILED, "scan busy");
+        set_state(PCH_WIFI_FAILED, "scan busy");
     }
 }
 
@@ -233,7 +233,7 @@ static void pick_from_scan(void)
     free(recs);
 
     if (!best) {
-        set_state(CT_WIFI_FAILED, "not in range");
+        set_state(PCH_WIFI_FAILED, "not in range");
         schedule_retry();
         return;
     }
@@ -269,7 +269,7 @@ static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
             || d->reason == WIFI_REASON_HANDSHAKE_TIMEOUT) {
             err = "wrong password";
         }
-        set_state(CT_WIFI_FAILED, err);
+        set_state(PCH_WIFI_FAILED, err);
         schedule_retry();
         return;
     }
@@ -277,14 +277,14 @@ static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         const ip_event_got_ip_t *e = data;
         snprintf(s_ip, sizeof(s_ip), IPSTR, IP2STR(&e->ip_info.ip));
         s_backoff_ms = 1000;
-        set_state(CT_WIFI_CONNECTED, NULL);
+        set_state(PCH_WIFI_CONNECTED, NULL);
         ESP_LOGI(TAG, "connected to %s as %s", s_ssid, s_ip);
         return;
     }
 }
 
 // --- API ----------------------------------------------------------------------
-void ct_wifi_init(const ct_wifi_cbs_t *cbs)
+void pch_wifi_init(const pch_wifi_cbs_t *cbs)
 {
     s_cbs = *cbs;
     nets_load();
@@ -313,7 +313,7 @@ void ct_wifi_init(const ct_wifi_cbs_t *cbs)
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
-void ct_wifi_scan(void)
+void pch_wifi_scan(void)
 {
     if (!s_started || s_scan != SCAN_NONE) return;
     s_scan = SCAN_REPORT;
@@ -323,7 +323,7 @@ void ct_wifi_scan(void)
     }
 }
 
-void ct_wifi_join(const char *ssid, const char *psk)
+void pch_wifi_join(const char *ssid, const char *psk)
 {
     if (!ssid || ssid[0] == '\0') return;
     net_remember(ssid, psk);
@@ -337,7 +337,7 @@ void ct_wifi_join(const char *ssid, const char *psk)
     connect_to(n);
 }
 
-void ct_wifi_forget(const char *ssid)
+void pch_wifi_forget(const char *ssid)
 {
     net_t *n = net_find(ssid);
     if (!n) return;
@@ -353,20 +353,20 @@ void ct_wifi_forget(const char *ssid)
     }
 }
 
-int ct_wifi_saved(char out[][CT_WIFI_SSID_CAP], int cap)
+int pch_wifi_saved(char out[][PCH_WIFI_SSID_CAP], int cap)
 {
     int n = s_net_count < cap ? s_net_count : cap;
-    for (int i = 0; i < n; i++) copy_str(out[i], CT_WIFI_SSID_CAP, s_nets[i].ssid);
+    for (int i = 0; i < n; i++) copy_str(out[i], PCH_WIFI_SSID_CAP, s_nets[i].ssid);
     return n;
 }
 
-ct_wifi_state_t ct_wifi_state(void) { return s_state; }
+pch_wifi_state_t pch_wifi_state(void) { return s_state; }
 
-const char *ct_wifi_ip(void) { return s_ip; }
+const char *pch_wifi_ip(void) { return s_ip; }
 
-void ct_wifi_report(void) { report(); }
+void pch_wifi_report(void) { report(); }
 
-bool ct_wifi_command(const char *json, int len)
+bool pch_wifi_command(const char *json, int len)
 {
     cJSON *root = cJSON_ParseWithLength(json, len);
     if (!root) return false;
@@ -380,13 +380,13 @@ bool ct_wifi_command(const char *json, int len)
     const cJSON *psk = cJSON_GetObjectItem(root, "psk");
 
     if (strcmp(c, "scan") == 0) {
-        ct_wifi_scan();
+        pch_wifi_scan();
     } else if (strcmp(c, "join") == 0 && cJSON_IsString(ssid)) {
-        ct_wifi_join(ssid->valuestring, cJSON_IsString(psk) ? psk->valuestring : NULL);
+        pch_wifi_join(ssid->valuestring, cJSON_IsString(psk) ? psk->valuestring : NULL);
     } else if (strcmp(c, "forget") == 0 && cJSON_IsString(ssid)) {
-        ct_wifi_forget(ssid->valuestring);
+        pch_wifi_forget(ssid->valuestring);
     } else if (strcmp(c, "status") == 0) {
-        ct_wifi_report();
+        pch_wifi_report();
     }
     cJSON_Delete(root);
     return true;

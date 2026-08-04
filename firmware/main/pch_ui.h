@@ -1,32 +1,32 @@
 // หน้าจอทั้งใบ — โครงเดียวกับ tools/gen/screen.py
 #pragma once
 
-#include "ct_model.h"
+#include "pch_model.h"
 
 // สร้าง widget ทั้งหมด ต้องเรียกหลัง lv_init และมี display แล้ว
-void ct_ui_init(void);
+void pch_ui_init(void);
 
 // เปลี่ยนภาพทั้งใบตาม snapshot ใหม่
-void ct_ui_set_snapshot(const ct_snapshot_t *snap);
+void pch_ui_set_snapshot(const pch_snapshot_t *snap);
 
 // มี snapshot สดอยู่ไหม — ไม่ว่าจะมาทาง BLE หรือ LAN ก็ตาม หลุดแล้วมาสคอตเป็นสีเทา
-// ไม่มีไอคอน ไม่มีข้อความ (DESIGN.md) · ตัวนี้คุมสี ส่วน `ct_ui_set_link` คุมข้อความ
-void ct_ui_set_connected(bool connected);
+// ไม่มีไอคอน ไม่มีข้อความ (DESIGN.md) · ตัวนี้คุมสี ส่วน `pch_ui_set_link` คุมข้อความ
+void pch_ui_set_connected(bool connected);
 
 // ไอคอนลิงก์บนแถบบน + ป้ายชื่อข้างจุด — BLE ชนะ WiFi เสมอเพราะเป็นทางหลัก
 // ทั้งคู่ false = ยังไม่มีใครคุยกับบอร์ดเลย · `ip` โผล่แทนชื่อเมื่อเหลือแต่ WiFi
 // ซึ่งเป็นตอนเดียวที่ผู้ใช้ต้องการมันจริงๆ (Mac หาบอร์ดไม่เจอ ต้องกรอกเอง)
-void ct_ui_set_link(bool ble, bool wifi, const char *ip);
+void pch_ui_set_link(bool ble, bool wifi, const char *ip);
 
 // เดินอนิเมชันหนึ่งเฟรม เรียกจากลูปหลัก
-void ct_ui_tick(void);
+void pch_ui_tick(void);
 
-// เข้า/ออกโหมดกลางคืน — ตัดทุกอย่างเหลือนาฬิกาใหญ่ (ดูเหตุผลใน ct_night.h)
-void ct_ui_set_night(bool on);
+// เข้า/ออกโหมดกลางคืน — ตัดทุกอย่างเหลือนาฬิกาใหญ่ (ดูเหตุผลใน pch_night.h)
+void pch_ui_set_night(bool on);
 
 // ผู้ใช้แตะจอเพื่อขอดูแผงโควตา — โชว์ทับการ์ดชั่วคราวแล้วคืนพื้นที่ให้เอง
 //
 // มีไว้เพราะแผงโควตาโผล่เฉพาะตอนไม่มีการ์ดค้าง ซึ่งเป็นจังหวะที่ผู้ใช้เลือกไม่ได้:
 // อยากรู้ว่าเหลือโควตาเท่าไรตอนไหน ก็ต้องรอให้การ์ดหมดไปเองก่อน การแตะจึงเป็นทางเดียว
 // ที่ทำให้คำถามนี้ถามได้ตอนที่อยากถาม
-void ct_ui_peek_usage(void);
+void pch_ui_peek_usage(void);
