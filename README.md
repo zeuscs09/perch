@@ -92,7 +92,10 @@ claude.ai.
   Tested against ESP32-D0WD-V3 rev 3.1, 4 MB flash, no PSRAM.
 - A **USB data cable** for the board's micro-USB port. Charge-only cables do not enumerate.
 
-<a href="https://s.shopee.co.th/9fJTGEoal1"><img src="docs/images/button-shop-en.webp" width="320" alt="Buy the ESP32 2.8&quot; board on Shopee"></a>
+<a href="https://s.shopee.co.th/4qEXaCOFvu"><img src="docs/images/button-shop-en.webp" width="320" alt="Buy the ESP32 2.8&quot; board on Shopee"></a>
+
+<sub>That button is a Shopee affiliate link — buying through it costs you nothing extra and
+sends a small commission here. Any seller's ESP32-2432S028R works just as well.</sub>
 
 **Mac**
 

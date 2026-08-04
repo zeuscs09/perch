@@ -89,7 +89,11 @@
   ราคาราวๆ 300 บาท ทดสอบกับ ESP32-D0WD-V3 rev 3.1 แฟลช 4 MB ไม่มี PSRAM
 - **สาย USB ที่ส่งข้อมูลได้** สำหรับพอร์ต micro-USB ของบอร์ด สายชาร์จอย่างเดียวจะไม่ขึ้นพอร์ต
 
-<a href="https://s.shopee.co.th/9fJTGEoal1"><img src="docs/images/button-shop.webp" width="320" alt="สั่งซื้อบอร์ด ESP32 2.8 นิ้ว บน Shopee"></a>
+<a href="https://s.shopee.co.th/4qEXaCOFvu"><img src="docs/images/button-shop.webp" width="320" alt="สั่งซื้อบอร์ด ESP32 2.8 นิ้ว บน Shopee"></a>
+
+<sub>ปุ่มนี้เป็นลิงก์ affiliate ของ Shopee — กดซื้อผ่านลิงก์นี้ราคาเท่าเดิม
+แต่มีค่าคอมมิชชันเล็กน้อยกลับมาที่โปรเจกต์ ถ้าจะซื้อจากร้านไหนก็ได้เหมือนกัน
+ขอแค่เป็น ESP32-2432S028R</sub>
 
 **เครื่อง Mac**
 
