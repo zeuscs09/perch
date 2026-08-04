@@ -40,10 +40,11 @@
 > - Reading your quota from claude.ai is optional and needs an account credential. Read
 >   [step 5](#5-quota-on-the-board) before you turn it on.
 
-A desk device that shows what Claude Code is doing right now. A blocky orange mascot
-lives on a small screen next to your keyboard: it types when Claude types, waves when a
-session needs your answer, and celebrates when a build finishes. The bars at the bottom
-are your Claude usage quota.
+A desk device that shows what your coding agents are doing right now. Blocky little
+creatures live on a small screen next to your keyboard — one per session, a different
+species per agent: they type when the agent types, wave when a session needs your answer,
+and celebrate when a build finishes. The bars at the bottom are your usage quota, the top
+strip is the time and the weather, and after 21:00 the whole thing turns into a clock.
 
 <img src="docs/images/screen_busy.gif" width="420" alt="Three sessions working, cards stacked on the right, quota bars at the bottom"> <img src="docs/images/app-menu.jpg" width="236" alt="The menu bar panel: session usage, weekly usage, and the board's state">
 
@@ -83,6 +84,32 @@ claude.ai.
 |:--|:--|
 | ![lan](docs/images/screen_lan.gif) | ![wifi](docs/images/screen_wifi.gif) |
 | Bluetooth is gone, so the label is the board's IP and the icon is a wave — but the snapshot still arrives, sealed, over the network. | The board is on the network with nothing to show: the Mac is asleep or the app is not running. |
+
+**At night, and when you touch it**
+
+From 21:00 to 07:00 the screen becomes a clock and nothing else: no mascot, no sky, no grass,
+no alerts, and the onboard LED goes dark. This is for a bedroom — a status display that lights
+up the room at 3am is a status display you unplug. Touch the screen and it comes back to
+normal for 15 seconds, then settles again.
+
+Outside those hours the backlight fades down after a minute of no touching and wakes
+instantly when you tap. Tapping also pages to the quota panel.
+
+## Three agents, three species
+
+Perch does not ask which agent you use — it watches for all three and shows whatever it finds.
+The silhouettes differ, not just the colours, because from across a room you read a shape long
+before you read a colour.
+
+| | Looks like | Found by | Setup |
+|:--|:--|:--|:--|
+| **Claude Code** | Blocky, four legs, orange | Its hook system | One click in the gear menu |
+| **Codex CLI** | A screen on two legs, blue | Reading its rollout files as they are written | **None** |
+| **Antigravity** (`agy`) | An arch you can see through, purple | Reading `~/.gemini/antigravity-cli` | **None** |
+
+Codex and Antigravity have no hook system to install into, so Perch reads the files they
+already write. Nothing is configured, nothing of theirs is modified, and neither is asked to
+report anything — if the tool is on the machine and running, it appears on the screen.
 
 ## What you need
 
@@ -209,10 +236,13 @@ Everything below is in **gear ▸ Settings… ▸ General**:
   Your existing settings are kept, and a backup is written beside the file.
 - **Board** — pick your board by name, or leave it on *Any board*.
 - **Brightness** — the slider drives the screen's backlight.
+- **Weather** — type a city, press Search, pick from the results. The sky above the mascots
+  then follows the real one: cloud, rain, fog, and the time of day. Leave it off and the sky
+  is a plain gradient that still tracks morning, day, dusk and night.
 - **Launch at login** — so it is running before you start work.
 
-Start a Claude Code session in any terminal. Within a second or two the mascot should
-start moving.
+Start a Claude Code session in any terminal — or `codex`, or `agy`. Within a second or two
+something should start moving.
 
 ## 5. Quota on the board
 

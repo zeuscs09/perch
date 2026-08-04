@@ -66,11 +66,13 @@ def state_gif(state: str, px: int = 7, connected: bool = True) -> list[Image.Ima
 
 
 SCENES: dict[str, screen.Screen] = {
+    # ฉากหลักของ README — ต้องมีครบสามสายพันธุ์ เพราะซิลลูเอ็ตที่ต่างกันคือสิ่งที่
+    # อธิบายด้วยคำไม่ได้ ต้องเห็นเอง
     "busy": screen.Screen(
         sessions=[
-            screen.Session("perch", "writing", 0.0),
-            screen.Session("perch", "building", 0.3),
-            screen.Session("sprite-gen", "reading", 0.6),
+            screen.Session("perch", "writing", 0.0, "claude"),
+            screen.Session("infra", "building", 0.3, "codex"),
+            screen.Session("sprite-gen", "reading", 0.6, "antigravity"),
         ],
         overflow=3,
         cards=[
@@ -90,8 +92,8 @@ SCENES: dict[str, screen.Screen] = {
     # โควตาปกติ — สภาพที่จอจะเป็นเกือบตลอดเวลาที่ไม่มีอะไรต้องเตือน
     "usage": screen.Screen(
         sessions=[
-            screen.Session("perch", "writing", 0.0),
-            screen.Session("docs", "reading", 0.4),
+            screen.Session("perch", "writing", 0.0, "claude"),
+            screen.Session("docs", "reading", 0.4, "antigravity"),
         ],
         clock="17:04",
         usage=[
@@ -133,8 +135,8 @@ SCENES: dict[str, screen.Screen] = {
     ),
     "done": screen.Screen(
         sessions=[
-            screen.Session("perch", "celebrate", 0.0),
-            screen.Session("docs", "idle", 0.4),
+            screen.Session("perch", "celebrate", 0.0, "claude"),
+            screen.Session("docs", "idle", 0.4, "codex"),
         ],
         cards=[screen.Card("perch", "Build finished, 0 warnings", "done")],
     ),
@@ -164,8 +166,8 @@ SCENES: dict[str, screen.Screen] = {
     # BLE หลุดแต่ snapshot ยังเดินทางมาทาง LAN — ข้อมูลสดทั้งจอ ไอคอนเป็นคลื่น WiFi
     "lan": screen.Screen(
         sessions=[
-            screen.Session("perch", "writing", 0.0),
-            screen.Session("docs", "idle", 0.5),
+            screen.Session("perch", "writing", 0.0, "claude"),
+            screen.Session("docs", "idle", 0.5, "codex"),
         ],
         connected=True,
         ble=False,
@@ -194,9 +196,9 @@ SCENES: dict[str, screen.Screen] = {
     ),
     "waiting": screen.Screen(
         sessions=[
-            screen.Session("perch", "waiting", 0.0),
-            screen.Session("perch", "searching", 0.5),
-            screen.Session("sprite-gen", "alert", 0.25),
+            screen.Session("perch", "waiting", 0.0, "claude"),
+            screen.Session("infra", "searching", 0.5, "antigravity"),
+            screen.Session("sprite-gen", "alert", 0.25, "codex"),
         ],
         cards=[
             screen.Card("sprite-gen", "Stopped: test suite failed (3 failing)", "alert"),
