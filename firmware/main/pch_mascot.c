@@ -29,10 +29,6 @@
 
 // มุมมนของชิ้นซิลลูเอ็ต — มนทุกมุมของทุกชิ้น เพราะ lv_draw_rect กำหนดรายมุมไม่ได้
 #define CORNER PCH_MASCOT_CORNER
-// ขายืดขึ้นไปซ้อนใต้ลำตัวเท่านี้ ก่อนถึงจะเริ่มวาด — สองเท่าของรัศมี ไม่ใช่หนึ่งเท่า:
-// มุมล่างของลำตัวก็มนด้วย ถ้าซ้อนแค่รัศมีเดียว มุมมนของขากับของลำตัวจะเว้าตรงกัน
-// แล้วเกิดรอยแหว่งกลางเส้นตรงที่ควรต่อเนื่อง (ขอบนอกของขาต่อกับขอบนอกของลำตัวพอดี)
-#define LEG_OVERLAP (CORNER * 2.0f)
 // แขนซ้อนเข้าไปในลำตัวเท่ารัศมี — พอให้มุมมนด้านในตกอยู่ใต้เนื้อลำตัวซึ่งทาสีเดียวกัน
 // ตรงนั้นเป็นกลางลำตัว ไม่ใช่มุม จึงไม่ต้องเผื่อสองเท่าแบบขา
 #define ARM_OVERLAP CORNER
@@ -54,6 +50,18 @@ typedef struct {
     float arm_h;
     bool has_screen;
     float screen[4];  // x, y, w, h ของจอจมสีเข้มที่ตาไปอยู่บนนั้น
+    // ช่องโหว่กลางลำตัวล่าง (x, y, w) — ความสูงคือส่วนที่เหลือลงไปถึงก้นลำตัว
+    //
+    // เป็นช่อง *ว่างจริง* ไม่ใช่สี่เหลี่ยมสีพื้นหลังทับ เพราะมาสคอตถูกวาดบนท้องฟ้าที่
+    // เปลี่ยนสีตามเวลา สี่เหลี่ยมสีตายตัวจะกลายเป็นรอยปะสีผิดทันทีที่ฟ้าเปลี่ยน
+    bool has_notch;
+    float notch[3];
+    // รัศมีมุมของลำตัวกับขา — แขนไม่ใช้ค่านี้ ที่ความกว้าง 6px รัศมีใหญ่จะทำให้แขน
+    // อ่านเป็นแคปซูลแทนที่จะเป็นท่อนที่ลบมุม
+    //
+    // **ต้องตั้งให้ครบทุกรายการ** — designated initializer ปล่อยฟิลด์ที่ไม่ได้เขียนไว้
+    // เป็นศูนย์ ซึ่งคือมุมคม และไม่มีอะไรเตือนว่ามาสคอตเปลี่ยนหน้าไปแล้ว
+    float corner;
 } shape_t;
 
 static const shape_t SHAPES[PCH_AGENT_COUNT] = {
@@ -67,7 +75,9 @@ static const shape_t SHAPES[PCH_AGENT_COUNT] = {
                                    {BODY_X + 7 * CELL, CELL}},
                           .arm_y = NUB_Y,
                           .arm_h = NUB_H,
-                          .has_screen = false},
+                          .has_screen = false,
+                          .has_notch = false,
+                          .corner = CORNER},
     // Codex — จอบนสองขา ไม่ใช่ตัวสี่ขาทาสีใหม่
     //
     // ตัวแยกที่อ่านออกจากอีกฝั่งห้องคือ *ซิลลูเอ็ต* ไม่ใช่สี: จำนวนขาต่างกัน (2 ไม่ใช่ 4)
@@ -81,17 +91,26 @@ static const shape_t SHAPES[PCH_AGENT_COUNT] = {
                          .arm_y = 2.6f,
                          .arm_h = 2.8f,
                          .has_screen = true,
-                         .screen = {3.1f, 0.7f, 9.8f, 6.0f}},
-    // Antigravity ยังใช้รูปทรงของ Claude — เปลี่ยนแค่สี จนกว่าจะมีคนวาดตัวให้มัน
-    [PCH_AGENT_ANTIGRAVITY] = {.body_h = LEG_TOP,
-                               .leg_count = 4,
-                               .legs = {{BODY_X + 0 * CELL, CELL},
-                                        {BODY_X + 2 * CELL, CELL},
-                                        {BODY_X + 5 * CELL, CELL},
-                                        {BODY_X + 7 * CELL, CELL}},
-                               .arm_y = NUB_Y,
-                               .arm_h = NUB_H,
-                               .has_screen = false},
+                         .screen = {3.1f, 0.7f, 9.8f, 6.0f},
+                         .has_notch = false,
+                         .corner = CORNER},
+    // Antigravity — ซุ้มโค้งที่มีช่องว่างอยู่ใต้ตัว ตามรูปตัว "A" ในโลโก้ของมัน
+    //
+    // ช่องโหว่คือตัวแยกที่แรงที่สุดในสามตัว: Claude กับ Codex เป็นก้อนตัน ตัวนี้มองทะลุได้
+    // ซึ่งอ่านออกจากอีกฝั่งห้องก่อนที่สายตาจะแยกสีม่วงออกจากสีฟ้าเสียอีก
+    //
+    // ขาอยู่ตรงใต้เสาพอดีและกว้างเท่ากัน เสากับขาจึงเป็นขาท่อนเดียวต่อเนื่อง — เคยลองให้ขา
+    // เยื้องออกด้านนอกตามที่โลโก้ถ่างออก แต่ที่ 4 px/unit มุมมนของขากับของเสาไปกัดกันจน
+    // เห็นเป็นรอยแหว่ง อ่านเป็นของที่วาดพลาด ไม่ใช่ของที่ตั้งใจ
+    [PCH_AGENT_ANTIGRAVITY] = {.body_h = 8.0f,
+                               .leg_count = 2,
+                               .legs = {{2.0f, 3.6f}, {10.4f, 3.6f}},
+                               .arm_y = 2.6f,
+                               .arm_h = 2.8f,
+                               .has_screen = false,
+                               .has_notch = true,
+                               .notch = {5.6f, 4.6f, 4.8f},
+                               .corner = CORNER * 2.0f},
 };
 
 static const shape_t *shape_of(pch_agent_t agent)
@@ -258,8 +277,11 @@ static void legs(pch_rects_t *o, const shape_t *sh, gait_t gait, float phase, ui
         float h = leg_h - lift;
         if (h < 0.6f) h = 0.6f;
         // ยืดขึ้นไปซ้อนใต้ลำตัว — ความสูงที่ *เห็น* ยังเป็น leg_h - lift เท่าเดิม
-        pch_rects_add_round(o, sh->legs[i][0], sh->body_h - LEG_OVERLAP, sh->legs[i][1],
-                           h + LEG_OVERLAP, color, CORNER);
+        // ซ้อนเป็นสองเท่าของรัศมี รัศมีที่ใหญ่ขึ้นจึงต้องซ้อนลึกขึ้นตาม ไม่งั้นมุมมนของขา
+        // กับของลำตัวจะเว้าตรงกันแล้วเกิดรอยแหว่งกลางเส้นที่ควรต่อเนื่อง
+        float overlap = sh->corner * 2.0f;
+        pch_rects_add_round(o, sh->legs[i][0], sh->body_h - overlap, sh->legs[i][1],
+                           h + overlap, color, sh->corner);
     }
 }
 
@@ -281,11 +303,21 @@ static void arm(pch_rects_t *o, float x0, float y, float h, float side, uint16_t
 static void body(pch_rects_t *o, const shape_t *sh, uint16_t color, uint16_t screen_c,
                  float arm_l, float arm_r, float arm_out)
 {
-    pch_rects_add_round(o, BODY_X, BODY_Y, BODY_W, sh->body_h, color, CORNER);
+    float r = sh->corner;
+    if (!sh->has_notch) {
+        pch_rects_add_round(o, BODY_X, BODY_Y, BODY_W, sh->body_h, color, r);
+    } else {
+        // ซุ้ม: คานบน + เสาสองข้าง โดยช่องตรงกลางไม่มีอะไรวาดทับเลย
+        float nx = sh->notch[0], ny = sh->notch[1], nw = sh->notch[2];
+        pch_rects_add_round(o, BODY_X, BODY_Y, BODY_W, ny, color, r);
+        pch_rects_add_round(o, BODY_X, ny, nx - BODY_X, sh->body_h - ny, color, r);
+        pch_rects_add_round(o, nx + nw, ny, BODY_X + BODY_W - nx - nw, sh->body_h - ny, color,
+                           r);
+    }
     // จอจมวาดทับลำตัวทันที ก่อนแขน — ตาจะมาทับอีกทีตอนท้าย pch_mascot_build()
     if (sh->has_screen) {
         pch_rects_add_round(o, sh->screen[0], sh->screen[1], sh->screen[2], sh->screen[3],
-                           screen_c, CORNER * 0.6f);
+                           screen_c, r * 0.6f);
     }
     if (arm_out == 0.0f) {
         arm(o, BODY_X - NUB_W, sh->arm_y + arm_l, sh->arm_h, -1.0f, color);

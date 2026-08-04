@@ -55,10 +55,6 @@ FOOT_Y = LEG_TOP + LEG_H  # 12 — ระดับที่มาสคอตย
 
 # มุมมนของชิ้นซิลลูเอ็ต — มนทุกมุมของทุกชิ้น เพราะ lv_draw_rect กำหนดรายมุมไม่ได้
 CORNER = L.mascot.corner
-# ขายืดขึ้นไปซ้อนใต้ลำตัวเท่านี้ ก่อนถึงจะเริ่มวาด — สองเท่าของรัศมี ไม่ใช่หนึ่งเท่า:
-# มุมล่างของลำตัวก็มนด้วย ถ้าซ้อนแค่รัศมีเดียว มุมมนของขากับของลำตัวจะเว้าตรงกัน
-# แล้วเกิดรอยแหว่งกลางเส้นตรงที่ควรต่อเนื่อง (ขอบนอกของขาต่อกับขอบนอกของลำตัวพอดี)
-LEG_OVERLAP = CORNER * 2.0
 # แขนซ้อนเข้าไปในลำตัวเท่ารัศมี — พอให้มุมมนด้านในตกอยู่ใต้เนื้อลำตัวซึ่งทาสีเดียวกัน
 # ตรงนั้นเป็นกลางลำตัว ไม่ใช่มุม จึงไม่ต้องเผื่อสองเท่าแบบขา
 ARM_OVERLAP = CORNER
@@ -80,6 +76,15 @@ class Shape:
     arm_h: float
     # จอจมสีเข้มที่ตาไปอยู่บนนั้น (x, y, w, h) — None = ลำตัวเรียบแบบ Claude
     screen: tuple[float, float, float, float] | None = None
+    # ช่องโหว่กลางลำตัวล่าง (x, y, w) — ความสูงคือส่วนที่เหลือลงไปถึงก้นลำตัว
+    #
+    # เป็นช่อง *ว่างจริง* ไม่ใช่สี่เหลี่ยมสีพื้นหลังทับ เพราะมาสคอตถูกวาดบนท้องฟ้าที่
+    # เปลี่ยนสีตามเวลา สี่เหลี่ยมสีตายตัวจะกลายเป็นรอยปะสีผิดทันทีที่ฟ้าเปลี่ยน
+    # ลำตัวจึงถูกประกอบจากคานบนกับเสาสองข้างแทนที่จะเป็นก้อนเดียว
+    notch: tuple[float, float, float] | None = None
+    # รัศมีมุมของลำตัวกับขา — แขนไม่ใช้ค่านี้ ที่ความกว้าง 6px รัศมีใหญ่จะทำให้แขน
+    # อ่านเป็นแคปซูลแทนที่จะเป็นท่อนที่ลบมุม
+    corner: float = CORNER
 
     @property
     def leg_h(self) -> float:
@@ -103,10 +108,27 @@ CODEX_SHAPE = Shape(
     screen=(3.1, 0.7, 9.8, 6.0),
 )
 
+# Antigravity — ซุ้มโค้งที่มีช่องว่างอยู่ใต้ตัว ตามรูปตัว "A" ในโลโก้ของมัน
+#
+# ช่องโหว่คือตัวแยกที่แรงที่สุดในสามตัว: Claude กับ Codex เป็นก้อนตัน ตัวนี้มองทะลุได้
+# ซึ่งอ่านออกจากอีกฝั่งห้องก่อนที่สายตาจะแยกสีม่วงออกจากสีฟ้าเสียอีก
+#
+# ขาอยู่ตรงใต้เสาพอดีและกว้างเท่ากัน เสากับขาจึงเป็นขาท่อนเดียวต่อเนื่อง — เคยลองให้ขา
+# เยื้องออกด้านนอกตามที่โลโก้ถ่างออก แต่ที่ 4 px/unit มุมมนของขากับของเสาไปกัดกันจน
+# เห็นเป็นรอยแหว่ง อ่านเป็นของที่วาดพลาด ไม่ใช่ของที่ตั้งใจ
+ANTIGRAV_SHAPE = Shape(
+    body_h=8.0,
+    legs=((2.0, 3.6), (10.4, 3.6)),
+    arm_y=2.6,
+    arm_h=2.8,
+    notch=(5.6, 4.6, 4.8),
+    corner=CORNER * 2.0,
+)
+
 SHAPES: dict[str, Shape] = {
     "claude": CLAUDE_SHAPE,
     "codex": CODEX_SHAPE,
-    "antigravity": CLAUDE_SHAPE,
+    "antigravity": ANTIGRAV_SHAPE,
 }
 
 # (ลำตัว, ลำตัวตอนหลับ, จอจม, ตา) — สามค่าแรกตรงกับ clay / clay_dark / clay_sleep ของ Claude
@@ -170,8 +192,11 @@ def _legs(
             lift += leg_h * 0.66
         # ยืดขึ้นไปซ้อนใต้ลำตัว — ความสูงที่ *เห็น* ยังเป็น leg_h - lift เท่าเดิม
         h = max(leg_h - lift, 0.6)
+        # ซ้อนขึ้นไปใต้ลำตัวเป็นสองเท่าของรัศมี — รัศมีที่ใหญ่ขึ้นต้องซ้อนลึกขึ้นตาม
+        # ไม่งั้นมุมมนของขากับของลำตัวจะเว้าตรงกันแล้วเกิดรอยแหว่งกลางเส้นที่ควรต่อเนื่อง
+        overlap = shape.corner * 2.0
         out.append(
-            Rect(lx, shape.body_h - LEG_OVERLAP, lw, h + LEG_OVERLAP, color, CORNER)
+            Rect(lx, shape.body_h - overlap, lw, h + overlap, color, shape.corner)
         )
     return out
 
@@ -204,11 +229,21 @@ def _body(
     """
     bx, by, bw = BODY[0], BODY[1], BODY[2]
     bh = shape.body_h
-    out = [Rect(bx, by, bw, bh, color, CORNER)]
+    r = shape.corner
+    if shape.notch is None:
+        out = [Rect(bx, by, bw, bh, color, r)]
+    else:
+        # ซุ้ม: คานบน + เสาสองข้าง โดยช่องตรงกลางไม่มีอะไรวาดทับเลย
+        nx, ny, nw = shape.notch
+        out = [
+            Rect(bx, by, bw, ny, color, r),
+            Rect(bx, ny, nx - bx, bh - ny, color, r),
+            Rect(nx + nw, ny, bx + bw - nx - nw, bh - ny, color, r),
+        ]
     # จอจมวาดทับลำตัวทันที ก่อนแขน — ตาจะมาทับอีกทีตอนท้าย build()
     if shape.screen is not None and screen_color is not None:
         sx, sy, sw, sh = shape.screen
-        out.append(Rect(sx, sy, sw, sh, screen_color, CORNER * 0.6))
+        out.append(Rect(sx, sy, sw, sh, screen_color, r * 0.6))
     arm_y, arm_h = shape.arm_y, shape.arm_h
     if arm_out == 0.0:
         out.append(_arm(bx - NUB_W, arm_y + arm_dy[0], arm_h, -1.0, color))
