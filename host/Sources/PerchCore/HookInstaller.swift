@@ -27,6 +27,52 @@ public enum HookInstaller {
         "SessionEnd",
     ]
 
+    /// ชื่อไบนารีที่นับว่าเป็น "ของเรา" — รวมชื่อเดิมก่อนโครงการเปลี่ยนมาเป็น Perch
+    ///
+    /// ต้องจำชื่อเก่าไว้ ไม่งั้นการอัปเกรดข้ามชื่อจะไม่รู้จัก hook ชุดเดิมของตัวเอง แล้ว
+    /// *เพิ่ม* ชุดใหม่ทับแทนที่จะแทนที่ — เหลือ hook สิบตัวชี้ไปที่แอปที่ถูกลบไปแล้ว
+    /// ทุกเหตุการณ์จึงยิงโปรเซสที่ตายทันทีเพิ่มอีกสิบตัว ซึ่งเป็นรูปแบบเดียวกับที่เคยทำ
+    /// ตารางโปรเซสของเครื่องเต็มมาแล้ว
+    static let ownNames = ["perch", "tamaclaude"]
+
+    static func isOurs(_ command: String) -> Bool {
+        command.contains("--hook") && ownNames.contains { command.contains($0) }
+    }
+
+    /// ตารางเหตุการณ์ชุดใหม่ จากของเดิม — แยกออกมาเป็นฟังก์ชันบริสุทธิ์เพื่อให้ทดสอบได้
+    /// โดยไม่ต้องแตะ `~/.claude/settings.json` ของจริง ซึ่งเป็นไฟล์ที่ผู้ใช้แก้เองอยู่
+    public static func applying(command: String, to hooks: [String: Any]) -> [String: Any] {
+        var hooks = hooks
+        for event in events {
+            var entries = hooks[event] as? [[String: Any]] ?? []
+            // ตัวแรกที่เจอได้พาธใหม่ ตัวที่เหลือถูกทิ้ง — หนึ่งเหตุการณ์ต้องยิงของเราครั้งเดียว
+            // ไม่ว่าจะเคยติดตั้งมากี่รอบหรือเคยใช้ชื่ออะไรมาก่อน
+            var kept = false
+            entries = entries.compactMap { entry -> [String: Any]? in
+                var entry = entry
+                let before = entry["hooks"] as? [[String: Any]] ?? []
+                let after = before.compactMap { h -> [String: Any]? in
+                    guard let c = h["command"] as? String, isOurs(c) else { return h }
+                    if kept { return nil }
+                    kept = true
+                    var h = h
+                    h["command"] = command
+                    return h
+                }
+                // กลุ่มที่เหลือแต่ของเราแล้วโดนทิ้งหมด ต้องหายไปทั้งกลุ่ม ไม่ใช่ค้างเป็นกลุ่มว่าง
+                // (กลุ่มที่ว่างมาแต่แรกไม่ใช่ของเรา ปล่อยไว้ตามเดิม)
+                if after.isEmpty && !before.isEmpty { return nil }
+                entry["hooks"] = after
+                return entry
+            }
+            if !kept {
+                entries.append(["hooks": [["type": "command", "command": command]]])
+            }
+            hooks[event] = entries
+        }
+        return hooks
+    }
+
     public enum InstallError: Error, CustomStringConvertible {
         case unreadableSettings
         case notJSONObject
@@ -56,35 +102,7 @@ public enum HookInstaller {
             try? data.write(to: settingsPath.appendingPathExtension("perch.bak"))
         }
 
-        var hooks = root["hooks"] as? [String: Any] ?? [:]
-        for event in events {
-            var entries = hooks[event] as? [[String: Any]] ?? []
-            let already = entries.contains { entry in
-                let inner = entry["hooks"] as? [[String: Any]] ?? []
-                return inner.contains { ($0["command"] as? String)?.contains("--hook") == true
-                    && ($0["command"] as? String)?.contains("perch") == true }
-            }
-            if already {
-                // อัปเดตพาธให้ตรงกับ binary ปัจจุบัน แทนที่จะเพิ่มซ้ำ
-                entries = entries.map { entry in
-                    var entry = entry
-                    let inner = (entry["hooks"] as? [[String: Any]] ?? []).map { h -> [String: Any] in
-                        var h = h
-                        if let c = h["command"] as? String,
-                            c.contains("perch"), c.contains("--hook") {
-                            h["command"] = command
-                        }
-                        return h
-                    }
-                    entry["hooks"] = inner
-                    return entry
-                }
-            } else {
-                entries.append(["hooks": [["type": "command", "command": command]]])
-            }
-            hooks[event] = entries
-        }
-        root["hooks"] = hooks
+        root["hooks"] = applying(command: command, to: root["hooks"] as? [String: Any] ?? [:])
 
         try FileManager.default.createDirectory(
             at: settingsPath.deletingLastPathComponent(), withIntermediateDirectories: true)

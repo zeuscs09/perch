@@ -27,13 +27,24 @@ public enum StatuslineInstaller {
         }
     }
 
+    /// สคริปต์ของเราเอง ในทุกชื่อที่โครงการเคยใช้
+    ///
+    /// เทียบแค่พาธปัจจุบันไม่พอ: ตอนอัปเกรดข้ามชื่อ `statusLine.command` ยังชี้ไปที่
+    /// `~/.tamaclaude/statusline.sh` ซึ่งไม่ตรงกับพาธใหม่ จึงถูกเข้าใจผิดว่าเป็นคำสั่ง
+    /// ของผู้ใช้แล้วรับมาเป็นปลายทางที่จะส่งงานต่อ — ปลายทางที่ย้ายที่ไปแล้ว
+    /// ผลคือ statusline ของผู้ใช้หายไปเงียบๆ ทุกสิบวินาทีโดยไม่มี error ให้เห็น
+    public static func isOurScript(_ command: String) -> Bool {
+        if command.contains(Paths.statusline.path) { return true }
+        return HookInstaller.ownNames.contains { command.contains("/.\($0)/statusline.sh") }
+    }
+
     /// คำสั่ง statusline เดิมของผู้ใช้ที่เราจะส่งงานวาดต่อให้ — `nil` ถ้าไม่เคยมี
     public static func previousCommand() -> String? {
         guard let data = try? Data(contentsOf: settingsPath),
             let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let line = root["statusLine"] as? [String: Any],
             let command = line["command"] as? String,
-            !command.contains(Paths.statusline.path)  // ของเราเอง อย่าเรียกวน
+            !isOurScript(command)  // ของเราเอง อย่าเรียกวน
         else { return nil }
         return command
     }
@@ -108,6 +119,11 @@ public enum StatuslineInstaller {
     }
 
     /// ดึงคำสั่งเดิมกลับจากสคริปต์ที่ติดตั้งไว้ — สคริปต์เป็นที่เก็บ ไม่ต้องมีไฟล์สำรองแยก
+    ///
+    /// กรองสคริปต์ของเราเองออกด้วย ไม่ใช่แค่คืนสิ่งที่อ่านได้: ถ้า PREV ที่ฝังอยู่เป็น
+    /// สคริปต์ของเราภายใต้ชื่อเก่า (ซึ่งเกิดขึ้นจริงตอนอัปเกรดข้ามชื่อ) การคืนมันออกไป
+    /// จะทำให้ค่าที่ชี้ไปที่ไฟล์ที่ไม่มีแล้วรอดการติดตั้งใหม่ และ `uninstall()` ก็จะ
+    /// "คืนช่อง" ให้กับสคริปต์ที่ตายไปแล้วแทนที่จะคืนให้ผู้ใช้
     public static func delegatedCommandInScript() -> String? {
         guard let text = try? String(contentsOf: Paths.statusline, encoding: .utf8) else {
             return nil
@@ -116,7 +132,8 @@ public enum StatuslineInstaller {
             let raw = line.dropFirst("PREV=".count).trimmingCharacters(in: .whitespaces)
             guard raw.count >= 2, raw.hasPrefix("'"), raw.hasSuffix("'") else { return nil }
             let inner = String(raw.dropFirst().dropLast())
-            return inner.isEmpty ? nil : inner.replacingOccurrences(of: "'\\''", with: "'")
+                .replacingOccurrences(of: "'\\''", with: "'")
+            return inner.isEmpty || isOurScript(inner) ? nil : inner
         }
         return nil
     }

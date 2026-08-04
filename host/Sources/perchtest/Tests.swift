@@ -522,6 +522,76 @@ func runAllTests() {
         expect(!FileManager.default.fileExists(atPath: tmp.path), "no temp file is left behind")
     }
 
+    suite("hooks left under the old project name are replaced, not duplicated") {
+        let new = "/Applications/Perch.app/Contents/MacOS/perch --hook"
+        let old = "/Applications/TamaClaude.app/Contents/MacOS/tamaclaude --hook"
+
+        func commands(_ hooks: [String: Any], _ event: String) -> [String] {
+            (hooks[event] as? [[String: Any]] ?? []).flatMap { entry in
+                (entry["hooks"] as? [[String: Any]] ?? []).compactMap { $0["command"] as? String }
+            }
+        }
+
+        // ชื่อเดิมต้องถูกจำได้ ไม่งั้นแต่ละเหตุการณ์จะเหลือ hook สองตัว ตัวหนึ่งชี้ไปที่แอป
+        // ที่ถูกลบไปแล้ว = โปรเซสที่ตายทันทีสิบตัวต่อหนึ่งเหตุการณ์
+        let upgraded = HookInstaller.applying(
+            command: new,
+            to: ["Stop": [["hooks": [["type": "command", "command": old]]]]])
+        expect(commands(upgraded, "Stop") == [new], "the old-name hook is rewritten in place")
+
+        // ติดตั้งซ้ำต้องไม่งอกเพิ่ม
+        let twice = HookInstaller.applying(command: new, to: upgraded)
+        expect(commands(twice, "Stop") == [new], "installing again changes nothing")
+
+        // ของผู้ใช้ในเหตุการณ์เดียวกันต้องรอด และต้องอยู่ก่อนของเรา
+        let mine = "/usr/local/bin/my-own-thing"
+        let shared = HookInstaller.applying(
+            command: new,
+            to: [
+                "Stop": [
+                    ["matcher": "Bash", "hooks": [["type": "command", "command": mine]]],
+                    ["hooks": [["type": "command", "command": old]]],
+                ]
+            ])
+        expect(commands(shared, "Stop") == [mine, new], "the user's own hook is left alone")
+        expect(
+            (shared["Stop"] as? [[String: Any]])?.first?["matcher"] as? String == "Bash",
+            "keys we do not understand survive")
+
+        // เคยติดตั้งซ้ำจนมีของเราหลายตัว — ต้องยุบเหลือตัวเดียว ไม่ใช่แก้พาธให้ทุกตัว
+        let dupes = HookInstaller.applying(
+            command: new,
+            to: [
+                "Stop": [
+                    ["hooks": [["type": "command", "command": old]]],
+                    ["hooks": [["type": "command", "command": new]]],
+                ]
+            ])
+        expect(commands(dupes, "Stop") == [new], "duplicates collapse to one")
+
+        expect(
+            commands(HookInstaller.applying(command: new, to: [:]), "SessionStart") == [new],
+            "a machine with no hooks at all still gets ours")
+    }
+
+    suite("our own statusline under the old name is never adopted as the user's") {
+        // ตอนอัปเกรดข้ามชื่อ statusLine.command ยังชี้ไปที่สคริปต์ของเราใต้ชื่อเก่า
+        // ถ้ารับมาเป็น "คำสั่งเดิมของผู้ใช้" สคริปต์ใหม่จะส่งงานต่อให้ไฟล์ที่ย้ายที่ไปแล้ว
+        // แล้ว statusline หายไปเงียบๆ ทุกสิบวินาทีโดยไม่มี error ให้เห็น
+        expect(
+            StatuslineInstaller.isOurScript("sh /Users/x/.tamaclaude/statusline.sh"),
+            "the old name is recognised as ours")
+        expect(
+            StatuslineInstaller.isOurScript("sh /Users/x/.perch/statusline.sh"),
+            "the current name is recognised as ours")
+        expect(
+            !StatuslineInstaller.isOurScript("bun x ccstatusline@latest"),
+            "a real third-party statusline is not mistaken for ours")
+        expect(
+            !StatuslineInstaller.isOurScript("node ~/.claude/plugins/statusline-counts.js"),
+            "a plugin statusline is not mistaken for ours")
+    }
+
     suite("state left under the old project name is moved, never recreated empty") {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("move-\(UUID().uuidString)", isDirectory: true)
