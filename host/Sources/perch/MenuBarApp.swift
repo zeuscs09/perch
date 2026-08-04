@@ -1,6 +1,6 @@
 import AppKit
 import ServiceManagement
-import TamaCore
+import PerchCore
 
 /// เมนูบาร์ = daemon ที่มีหน้าตา
 ///
@@ -142,7 +142,7 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         } catch {
             // socket ถูกจองอยู่ = มี daemon อีกตัวรันค้าง บอกให้รู้แล้วออก
             // ดีกว่าโผล่ในเมนูบาร์เงียบๆ ทั้งที่ไม่ได้ทำงาน
-            alert("TamaClaude could not start", "\(error)")
+            alert("Perch could not start", "\(error)")
             NSApp.terminate(nil)
             return
         }
@@ -329,7 +329,7 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         guard let badge else {
             // ยังไม่เคยรู้โควตาเลย หรือหน้าต่างหมุนไปแล้วโดยไม่มีค่าใหม่ — ถอยไปเป็นไอคอนเดิม
             statusItem.button?.image = MenuBadgeImage.fallback()
-            statusItem.button?.toolTip = "TamaClaude — no usage figures yet"
+            statusItem.button?.toolTip = "Perch — no usage figures yet"
             return
         }
         statusItem.button?.image = MenuBadgeImage.make(
@@ -541,7 +541,7 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         a.messageText = "Set the claude.ai session key"
         a.informativeText =
             "Browser DevTools → Application → Cookies → claude.ai → sessionKey.\n"
-            + "It is a full account credential; TamaClaude stores it readable only by you."
+            + "It is a full account credential; Perch stores it readable only by you."
         a.accessoryView = field
         a.addButton(withTitle: "Save")
         a.addButton(withTitle: "Cancel")
@@ -588,7 +588,7 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             try HookInstaller.install()
             alert(
                 "Hooks installed",
-                "Claude Code will report to TamaClaude from the next session onwards.")
+                "Claude Code will report to Perch from the next session onwards.")
         } catch {
             alert("Could not install hooks", "\(error)")
         }
@@ -610,9 +610,9 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 alert(
                     "Usage display turned on",
                     previous.map {
-                        "Claude Code reports your quota to TamaClaude from the next render "
+                        "Claude Code reports your quota to Perch from the next render "
                             + "onwards. Your own status line still runs and looks the same:\n\n\($0)"
-                    } ?? "Claude Code reports your quota to TamaClaude from the next render onwards.")
+                    } ?? "Claude Code reports your quota to Perch from the next render onwards.")
             }
         } catch {
             alert("Could not change the usage display", "\(error)")

@@ -13,7 +13,7 @@ import Foundation
 public enum LanWire {
     public static let port: UInt16 = 7333
     /// ประเภทบริการที่บอร์ดประกาศทาง mDNS
-    public static let serviceType = "_tamaclaude._tcp"
+    public static let serviceType = "_perch._tcp"
 
     static let magic = Data("TAMA".utf8)
     static let version: UInt8 = 1
@@ -101,7 +101,7 @@ public struct LanSealer {
         return data
     }
 
-    /// ทางกลับ — มีไว้ให้ `tamatest` พิสูจน์ว่าสิ่งที่ปิดผนึกไปเปิดกลับได้จริง
+    /// ทางกลับ — มีไว้ให้ `perchtest` พิสูจน์ว่าสิ่งที่ปิดผนึกไปเปิดกลับได้จริง
     /// ตัวจริงที่เปิดคือ firmware ซึ่งใช้ mbedtls คนละตัวกัน จึงต้องพิสูจน์ทั้งสองทาง
     public static func open(frame: Data, key: Data) -> (counter: UInt64, payload: Data)? {
         guard key.count == 32, frame.count > 4 else { return nil }

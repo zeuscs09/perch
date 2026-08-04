@@ -297,7 +297,7 @@ static void announce(void)
     const char *name = ct_ble_name();
     mdns_hostname_set(name);
     mdns_instance_name_set(name);
-    if (mdns_service_add(NULL, "_tamaclaude", "_tcp", CT_LAN_PORT, NULL, 0) != ESP_OK) {
+    if (mdns_service_add(NULL, "_perch", "_tcp", CT_LAN_PORT, NULL, 0) != ESP_OK) {
         ESP_LOGW(TAG, "mdns service failed");
         return;
     }

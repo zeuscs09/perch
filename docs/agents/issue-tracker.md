@@ -12,7 +12,7 @@ Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for all op
 - **Close**: `gh issue close <number> --comment "..."`
 
 Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
-For this repo that resolves to `thaitop/tamaclaude`.
+For this repo that resolves to `zeuscs09/perch`.
 
 ## Pull requests as a triage surface
 

@@ -1,5 +1,5 @@
 import AppKit
-import TamaCore
+import PerchCore
 
 /// หน้าตาของ popover ที่เด้งจากไอคอนแถบเมนู
 ///

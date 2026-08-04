@@ -72,7 +72,7 @@ public enum StatuslineInstaller {
                 else { throw InstallError.notJSONObject }
                 root = obj
             }
-            try? data.write(to: settingsPath.appendingPathExtension("tamaclaude.bak"))
+            try? data.write(to: settingsPath.appendingPathExtension("perch.bak"))
         }
 
         // refreshInterval: statusline เป็น event-driven ล้วนโดยดีฟอลต์ และเอกสารระบุว่า
@@ -129,7 +129,7 @@ public enum StatuslineInstaller {
     public static func script(binary: String, delegateTo previous: String?) -> String {
         """
         #!/bin/sh
-        # สร้างโดย tamaclaude --install-statusline — แก้ที่ StatuslineInstaller.swift
+        # สร้างโดย perch --install-statusline — แก้ที่ StatuslineInstaller.swift
         #
         # หน้าที่: ดัก JSON ที่ Claude Code ป้อนเข้า statusline เพื่อเก็บ rate_limits
         # ลง cache ให้ daemon อ่าน แล้วส่งงานวาดต่อให้คำสั่งเดิมของผู้ใช้

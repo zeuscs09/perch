@@ -3,7 +3,7 @@ import Foundation
 /// ตาราง tool -> สถานะภาพ
 ///
 /// การแปลอยู่ฝั่ง daemon ทั้งหมด (ข้อตกลงใน DESIGN.md) firmware รู้จักแค่ enum คงที่
-/// ผู้ใช้แก้ตารางได้ที่ `~/.tamaclaude/tools.json` โดยไม่ต้องแฟลชบอร์ดใหม่
+/// ผู้ใช้แก้ตารางได้ที่ `~/.perch/tools.json` โดยไม่ต้องแฟลชบอร์ดใหม่
 public struct ToolMap: Sendable {
     /// ชื่อเป๊ะ เช่น "Read"
     public var exact: [String: VisualState]

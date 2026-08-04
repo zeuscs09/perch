@@ -17,7 +17,7 @@ public final class LanTransport: Transport {
 
     public private(set) var isConnected = false
 
-    private let queue = DispatchQueue(label: "tamaclaude.lan")
+    private let queue = DispatchQueue(label: "perch.lan")
     private var running = false
     private var connection: NWConnection?
     private var browser: NWBrowser?

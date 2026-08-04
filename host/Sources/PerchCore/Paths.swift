@@ -7,6 +7,11 @@ public enum Paths {
     }
 
     public static var stateDir: URL {
+        home.appendingPathComponent(".perch", isDirectory: true)
+    }
+
+    /// ชื่อเดิมก่อนโครงการเปลี่ยนชื่อเป็น Perch
+    static var legacyStateDir: URL {
         home.appendingPathComponent(".tamaclaude", isDirectory: true)
     }
 
@@ -51,8 +56,51 @@ public enum Paths {
 
     @discardableResult
     public static func ensureStateDir() -> Bool {
-        (try? FileManager.default.createDirectory(
+        // ต้องมาก่อน createDirectory — ตัวย้ายทำงานก็ต่อเมื่อปลายทาง *ยังไม่มี*
+        // สร้างโฟลเดอร์ว่างก่อนแล้วจะไม่มีวันได้ของเก่ากลับมาอีกเลย
+        migrateLegacyState()
+        return (try? FileManager.default.createDirectory(
             at: stateDir, withIntermediateDirectories: true)) != nil
+    }
+
+    /// ย้ายของจาก `~/.tamaclaude` มา `~/.perch` ครั้งเดียวตอนอัปเกรดข้ามชื่อ
+    ///
+    /// ในนั้นมีของที่สร้างใหม่แทนกันไม่ได้: `session-key` ที่ผู้ใช้ไปลอกจากเบราว์เซอร์มาแปะเอง
+    /// และ `lan-key` ที่ถ้าหายแล้วบอร์ดจะปฏิเสธทุกเฟรมจนกว่าจะแฟลชกุญแจใหม่ลงไป
+    /// การเปลี่ยนชื่อโครงการต้องไม่แปลว่าผู้ใช้ต้องไปตั้งค่าพวกนั้นใหม่
+    ///
+    /// ย้ายทั้งโฟลเดอร์ทีเดียวแทนที่จะไล่ทีละไฟล์ เพราะของที่เพิ่มเข้ามาทีหลังจะได้ตามมาเอง
+    /// โดยไม่ต้องมีใครจำได้ว่าต้องมาเติมชื่อไฟล์ในรายการนี้
+    static func migrateLegacyState() {
+        migrateState(from: legacyStateDir, to: stateDir)
+    }
+
+    /// รับพาธเข้ามาเพื่อให้ทดสอบได้จริง — `NSHomeDirectory()` บน macOS อ่านจาก getpwuid
+    /// ไม่สน `$HOME` จึงหลอกด้วย env ไม่ได้ และเทสต์ที่ต้องแตะบ้านจริงของผู้ใช้คือเทสต์
+    /// ที่ไม่มีใครกล้ารัน
+    ///
+    /// คืน `true` เมื่อย้ายจริงในรอบนี้ — ผู้เรียกใช้แยก "ย้ายสำเร็จ" ออกจาก "ไม่มีอะไรให้ย้าย"
+    @discardableResult
+    public static func migrateState(from legacy: URL, to current: URL) -> Bool {
+        let fm = FileManager.default
+        // ปลายทางมีอยู่แล้ว = เคยย้ายไปแล้ว หรือผู้ใช้เริ่มใหม่หมด — ห้ามทับของที่ใหม่กว่า
+        guard !fm.fileExists(atPath: current.path),
+            fm.fileExists(atPath: legacy.path)
+        else { return false }
+        do {
+            try fm.createDirectory(
+                at: current.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try fm.moveItem(at: legacy, to: current)
+        } catch {
+            Log.info(
+                "ย้าย \(legacy.path) ไม่สำเร็จ (\(error))"
+                    + " — ลอก session-key กับ lan-key มาเองที่ \(current.path)")
+            return false
+        }
+        // socket ที่ติดมาด้วยเป็นของ daemon ตัวที่ตายไปแล้ว ทิ้งไว้จะจองพาธใหม่ไม่ได้
+        try? fm.removeItem(at: current.appendingPathComponent("daemon.sock"))
+        Log.info("ย้าย \(legacy.path) -> \(current.path) แล้ว")
+        return true
     }
 }
 
@@ -67,7 +115,7 @@ public enum Log {
     private static let lock = NSLock()
 
     public static func info(_ msg: @autoclosure () -> String) {
-        let line = "[tamaclaude] \(msg())\n"
+        let line = "[perch] \(msg())\n"
         FileHandle.standardError.write(Data(line.utf8))
         guard toFile else { return }
         lock.lock()

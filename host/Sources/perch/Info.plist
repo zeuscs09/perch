@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleIdentifier</key>
-  <string>com.tamaclaude.daemon</string>
+  <string>com.perch.daemon</string>
   <key>CFBundleName</key>
-  <string>TamaClaude</string>
+  <string>Perch</string>
   <key>CFBundleDisplayName</key>
-  <string>TamaClaude</string>
+  <string>Perch</string>
   <key>CFBundleExecutable</key>
-  <string>tamaclaude</string>
+  <string>perch</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleIconFile</key>
@@ -27,15 +27,15 @@
   <string>14.0</string>
   <!-- ขาดคีย์นี้แล้ว TCC ไม่ได้ปฏิเสธเฉยๆ แต่ยิง SIGABRT ใส่ทั้งโปรเซส -->
   <key>NSBluetoothAlwaysUsageDescription</key>
-  <string>TamaClaude talks to the desk display over Bluetooth LE.</string>
+  <string>Perch talks to the desk display over Bluetooth LE.</string>
   <!-- ทางสำรองเมื่อ BLE ไกลเกิน: หาบอร์ดบน LAN แล้วส่ง snapshot ไปทาง TCP
        macOS 15 ขึ้นไปขออนุญาต Local Network แยกจาก Bluetooth และการขาดคีย์นี้
        ทำให้ทั้ง Bonjour และการต่อไปหา IP ตรงๆ เงียบไปเฉยๆ ไม่มี error ให้เห็น -->
   <key>NSLocalNetworkUsageDescription</key>
-  <string>TamaClaude sends the display update to the desk board over your local network when Bluetooth is out of range.</string>
+  <string>Perch sends the display update to the desk board over your local network when Bluetooth is out of range.</string>
   <key>NSBonjourServices</key>
   <array>
-    <string>_tamaclaude._tcp</string>
+    <string>_perch._tcp</string>
   </array>
 </dict>
 </plist>

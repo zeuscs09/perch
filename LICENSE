@@ -1,6 +1,11 @@
 MIT License
 
+Copyright (c) 2026 tonjingjai
 Copyright (c) 2026 Uthai Moolpak
+
+Perch began as a fork of TamaClaude (github.com/thaitop/tamaclaude) by Uthai
+Moolpak. The copyright notice above is kept as the MIT license requires, and
+covers the parts of this project that came from there.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

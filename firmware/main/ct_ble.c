@@ -20,7 +20,7 @@ static const char *TAG = "ble";
 
 // ชื่อต้องไม่ซ้ำกันเมื่อมีหลายบอร์ดในห้องเดียวกัน ไม่งั้นผู้ใช้เลือกไม่ถูกว่าตัวไหนคือตัวไหน
 // ต่อท้ายด้วยสองไบต์สุดท้ายของ MAC ซึ่งพิมพ์อยู่บนตัวบอร์ดอยู่แล้ว
-static char s_device_name[24] = "tamaclaude";
+static char s_device_name[24] = "perch";
 
 // BLE_UUID128_INIT รับไบต์เรียงกลับ (LSB ก่อน)
 #define UUID128_TAMA(last)                                                                \
@@ -197,7 +197,7 @@ static void on_sync(void)
     uint8_t addr[6] = {0};
     if (ble_hs_id_copy_addr(s_addr_type, addr, NULL) == 0) {
         // addr เรียงกลับ (LSB ก่อน) สองไบต์สุดท้ายของ MAC จึงอยู่ที่ index 1 กับ 0
-        snprintf(s_device_name, sizeof(s_device_name), "tamaclaude-%02x%02x", addr[1],
+        snprintf(s_device_name, sizeof(s_device_name), "perch-%02x%02x", addr[1],
                  addr[0]);
         ble_svc_gap_device_name_set(s_device_name);
     }

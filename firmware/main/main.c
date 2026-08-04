@@ -1,4 +1,4 @@
-// tamaclaude — จอแสดงสถานะ Claude Code บนบอร์ด CYD
+// perch — จอแสดงสถานะ Claude Code บนบอร์ด CYD
 //
 // เส้นทางข้อมูล: BLE write -> staging (mutex) -> ลูปหลัก -> LVGL -> SPI -> จอ
 // LVGL ไม่ปลอดภัยกับหลายเธรด ทุกการแตะ UI จึงเกิดในลูปหลักที่เดียว

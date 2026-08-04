@@ -1,5 +1,5 @@
 import AppKit
-import TamaCore
+import PerchCore
 
 /// แบดจ์บนแถบเมนูในรูปภาพเดียว — แถบวัดสั้นๆ กับเปอร์เซ็นต์
 ///

@@ -44,7 +44,7 @@ public enum UsagePoll {
         guard FileManager.default.fileExists(atPath: target.path) else {
             throw Failure(
                 message: "no session key at \(url.path) — "
-                    + "set one from the TamaClaude gear menu, or paste the claude.ai sessionKey "
+                    + "set one from the Perch gear menu, or paste the claude.ai sessionKey "
                     + "cookie into that file and `chmod 600` it",
                 code: Failure.unusableKeyFile)
         }
@@ -162,7 +162,7 @@ public enum UsagePoll {
         var request = URLRequest(url: url, timeoutInterval: timeout)
         request.setValue("sessionKey=\(key)", forHTTPHeaderField: "Cookie")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("tamaclaude", forHTTPHeaderField: "User-Agent")
+        request.setValue("perch", forHTTPHeaderField: "User-Agent")
 
         var body: Data?
         var status = 0
@@ -213,7 +213,7 @@ public enum UsagePoll {
     public static func run(
         keyFile: URL = Paths.sessionKey,
         cache: URL = Paths.usageCache,
-        orgOverride: String? = ProcessInfo.processInfo.environment["TAMACLAUDE_ORG_ID"],
+        orgOverride: String? = ProcessInfo.processInfo.environment["PERCH_ORG_ID"],
         now: Date = Date()
     ) throws -> Report {
         // ถามรายการ org ทุกรอบแม้จะถูกพินไว้แล้ว: เมนูของผู้เรียกต้องมีรายการให้เลือก

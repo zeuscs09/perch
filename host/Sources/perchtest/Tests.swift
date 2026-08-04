@@ -1,5 +1,5 @@
 import Foundation
-import TamaCore
+import PerchCore
 
 let t0 = Date(timeIntervalSince1970: 1_700_000_000)
 
@@ -7,7 +7,7 @@ func event(
     _ name: String,
     _ session: String = "s1",
     tool: String? = nil,
-    cwd: String = "/Users/x/Documents/GitHub/tamaclaude",
+    cwd: String = "/Users/x/Documents/GitHub/perch",
     message: String? = nil
 ) -> HookEvent {
     HookEvent(
@@ -65,7 +65,7 @@ func runAllTests() {
             s.snapshot(now: t0 + 2).sessions.first?.state, .writing,
             "the pose lingers so a fast tool is still visible")
         equal(s.snapshot(now: t0 + 7).sessions.first?.state, .thinking, "back to thinking after a tool")
-        equal(s.snapshot(now: t0 + 7).sessions.first?.project, "tamaclaude", "project name from cwd")
+        equal(s.snapshot(now: t0 + 7).sessions.first?.project, "perch", "project name from cwd")
     }
 
     suite("every pose stays on screen long enough to read") {
@@ -324,7 +324,7 @@ func runAllTests() {
 
         let snap = Snapshot(
             clock: "09:05", date: "Tue 1 Jan",
-            sessions: [SessionSnap(project: "tamaclaude", state: .writing)],
+            sessions: [SessionSnap(project: "perch", state: .writing)],
             cards: [CardSnap(title: "t", body: "b", kind: .done)])
         let back = try JSONDecoder().decode(Snapshot.self, from: snap.encoded())
         equal(back, snap, "round trips")
@@ -518,8 +518,60 @@ func runAllTests() {
 
         // temp + rename — ไม่มีไฟล์ค้างให้ใครอ่านเจอครึ่งทาง
         let tmp = url.deletingLastPathComponent()
-            .appendingPathComponent(".\(url.lastPathComponent).tamaclaude.tmp")
+            .appendingPathComponent(".\(url.lastPathComponent).perch.tmp")
         expect(!FileManager.default.fileExists(atPath: tmp.path), "no temp file is left behind")
+    }
+
+    suite("state left under the old project name is moved, never recreated empty") {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("move-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        /// สร้างบ้านหลังเก่าพร้อมของที่สร้างใหม่แทนกันไม่ได้
+        func legacyDir(_ name: String) throws -> URL {
+            let dir = root.appendingPathComponent(name, isDirectory: true)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try Data("secret".utf8).write(to: dir.appendingPathComponent("session-key"))
+            try Data("abcd".utf8).write(to: dir.appendingPathComponent("lan-key"))
+            return dir
+        }
+        func read(_ dir: URL, _ name: String) -> String? {
+            (try? Data(contentsOf: dir.appendingPathComponent(name)))
+                .map { String(decoding: $0, as: UTF8.self) }
+        }
+
+        let old = try legacyDir("old-a")
+        let new = root.appendingPathComponent("new-a", isDirectory: true)
+        expect(Paths.migrateState(from: old, to: new), "it reports that it moved something")
+        expect(read(new, "session-key") == "secret", "the claude.ai key comes across")
+        expect(read(new, "lan-key") == "abcd", "the board key comes across")
+        expect(
+            !FileManager.default.fileExists(atPath: old.path),
+            "the old directory is gone, so the next run has nothing left to move")
+
+        // ปลายทางที่มีอยู่แล้วคือของที่ใหม่กว่าเสมอ — การทับมันคือการลบคีย์ปัจจุบันทิ้ง
+        let old2 = try legacyDir("old-b")
+        let new2 = root.appendingPathComponent("new-b", isDirectory: true)
+        try FileManager.default.createDirectory(at: new2, withIntermediateDirectories: true)
+        try Data("current".utf8).write(to: new2.appendingPathComponent("session-key"))
+        expect(!Paths.migrateState(from: old2, to: new2), "it declines when the new home exists")
+        expect(read(new2, "session-key") == "current", "the key already in place is untouched")
+
+        expect(
+            !Paths.migrateState(
+                from: root.appendingPathComponent("nothing-here"),
+                to: root.appendingPathComponent("new-c")),
+            "a fresh install with no old directory is not an error")
+
+        // socket ของ daemon ที่ตายไปแล้วติดมาด้วย ทิ้งไว้จะจองพาธเดิมไม่ได้
+        let old3 = try legacyDir("old-d")
+        try Data().write(to: old3.appendingPathComponent("daemon.sock"))
+        let new3 = root.appendingPathComponent("new-d", isDirectory: true)
+        Paths.migrateState(from: old3, to: new3)
+        expect(
+            !FileManager.default.fileExists(
+                atPath: new3.appendingPathComponent("daemon.sock").path),
+            "the dead socket does not come across")
     }
 
     suite("the session key file is refused unless only its owner can read it") {
@@ -651,7 +703,7 @@ func runAllTests() {
     suite("usage on the wire") {
         let snap = Snapshot(
             clock: "17:04", date: "Mon 27 Jul",
-            sessions: [SessionSnap(project: "tamaclaude", state: .writing)],
+            sessions: [SessionSnap(project: "perch", state: .writing)],
             usage: [UsageSnap(percent: 35, remaining: 10_980),
                     UsageSnap(percent: 48, remaining: 111_600)])
         let data = try snap.encoded()
@@ -801,7 +853,7 @@ func runAllTests() {
 
     suite("statusline script never breaks the user's own statusline") {
         let script = StatuslineInstaller.script(
-            binary: "/Applications/TamaClaude.app/Contents/MacOS/tamaclaude",
+            binary: "/Applications/Perch.app/Contents/MacOS/perch",
             delegateTo: "bash /Users/x/.claude/statusline-command.sh")
         expect(script.contains("exit 0"), "always exits clean")
         expect(script.contains("|| true"), "a failing delegate cannot take the line down")
@@ -840,7 +892,7 @@ func runAllTests() {
         ]
         let root: [String: Any] = [
             "model": ["display_name": "Opus 5"],
-            "workspace": ["current_dir": "/Users/x/Documents/GitHub/tamaclaude"],
+            "workspace": ["current_dir": "/Users/x/Documents/GitHub/perch"],
             "context_window_size": 1_000_000,
             "current_usage": [
                 "input_tokens": 1200, "output_tokens": 3400,
@@ -854,7 +906,7 @@ func runAllTests() {
         equal(lines.count, 2, "quota gets a line of its own")
         equal(
             lines.first ?? "",
-            "❯ tamaclaude │ ⌘ Opus 5 │ ◐ Ctx: 17% │ ⧉ ↑171.2K ↓3.4K/1M tok",
+            "❯ perch │ ⌘ Opus 5 │ ◐ Ctx: 17% │ ⧉ ↑171.2K ↓3.4K/1M tok",
             "the first line is the session, not the quota")
 
         // 37% ปัดเป็นแถบ 4 ช่อง ส่วนเวลาที่ผ่านไป 3 จาก 5 ชั่วโมงวางขีดไว้ช่องที่ 7
@@ -893,7 +945,7 @@ func runAllTests() {
         bare.showModel = false
         equal(
             StatuslineRender.render(root: root, cache: cache, config: bare, git: nil, now: now),
-            "❯ tamaclaude\n⧖ 37%",
+            "❯ perch\n⧖ 37%",
             "every element is its own switch")
 
         // ชื่อ branch กับจำนวนบรรทัดมาจาก git ไม่ใช่จาก payload
@@ -903,7 +955,7 @@ func runAllTests() {
         let git = StatuslineRender.GitInfo(branch: "main", added: 12, removed: 3)
         equal(
             StatuslineRender.render(root: root, cache: cache, config: withGit, git: git, now: now),
-            "❯ tamaclaude │ ⎇ main │ +12 -3\n⧖ 37%",
+            "❯ perch │ ⎇ main │ +12 -3\n⧖ 37%",
             "git has its own two elements")
         equal(GitSummary.count("3 files changed, 12 insertions(+), 4 deletions(-)",
                                unit: "deletion"), 4, "shortstat is read by unit, not position")
@@ -956,9 +1008,9 @@ func runAllTests() {
 
         let one = Snapshot(
             clock: "10:00", date: "1 Jan",
-            sessions: [SessionSnap(project: "tamaclaude", state: .writing)])
+            sessions: [SessionSnap(project: "perch", state: .writing)])
         equal(
-            PanelText.sessions(one), ["tamaclaude \u{00B7} writing"],
+            PanelText.sessions(one), ["perch \u{00B7} writing"],
             "a session is its project and its state")
 
         let many = Snapshot(
@@ -1212,7 +1264,7 @@ func runAllTests() {
 
         // key ไม่เคยผ่าน env — org id ผ่านได้ ไม่ใช่ความลับ · exit code เดินทางกลับมาครบ
         let talker = try script(
-            #"echo "org $TAMACLAUDE_ORG_ID Acme Corp"; echo "key expired"; exit 2"#)
+            #"echo "org $PERCH_ORG_ID Acme Corp"; echo "key expired"; exit 2"#)
         let spoke = Result()
         _ = PollProcess.launcher(talker)("o-9") { spoke.outcome = $0 }
         expect(wait { spoke.outcome != nil }, "the child's exit is reported back")
@@ -1429,8 +1481,8 @@ func runAllTests() {
                "without one we walk the known places")
 
         // คีย์ที่ไม่มี UI ต้องมีเทสต์ ไม่งั้นชื่อคีย์ที่พิมพ์ผิดจะไม่มีอะไรจับได้เลย
-        let defaults = UserDefaults(suiteName: "tamatest.claudePath")!
-        defaults.removePersistentDomain(forName: "tamatest.claudePath")
+        let defaults = UserDefaults(suiteName: "perchtest.claudePath")!
+        defaults.removePersistentDomain(forName: "perchtest.claudePath")
         expect(ClaudeBinary.override(defaults) == nil, "an unset key is no override")
         defaults.set("   ", forKey: ClaudeBinary.overrideKey)
         expect(ClaudeBinary.override(defaults) == nil,
@@ -1438,7 +1490,7 @@ func runAllTests() {
         defaults.set("  /odd/claude \n", forKey: ClaudeBinary.overrideKey)
         equal(ClaudeBinary.override(defaults), "/odd/claude",
               "a path pasted with whitespace around it is still that path")
-        defaults.removePersistentDomain(forName: "tamatest.claudePath")
+        defaults.removePersistentDomain(forName: "perchtest.claudePath")
         equal(ClaudeBinary.locate(searched), .missing(["/somewhere/odd/claude"]),
               "and a place with nothing in it comes back naming itself")
 
@@ -1484,13 +1536,13 @@ func runAllTests() {
         equal(PanelText.heading(orgs: orgs, current: "o-2", hasKey: true), "Acme Corp",
               "the org being polled is what the head says")
         // ยังไม่ได้ตั้ง key = ยังไม่เคยถามใครว่ามี org อะไรบ้าง ชื่อแอปจึงจริงกว่าชื่อ org
-        equal(PanelText.heading(orgs: orgs, current: "o-2", hasKey: false), "TamaClaude",
+        equal(PanelText.heading(orgs: orgs, current: "o-2", hasKey: false), "Perch",
               "no key means no org to speak of, whatever is left in the list")
-        equal(PanelText.heading(orgs: [], current: nil, hasKey: true), "TamaClaude",
+        equal(PanelText.heading(orgs: [], current: nil, hasKey: true), "Perch",
               "before the first round comes back there is still nothing to name")
         // ตัวที่เลือกไว้แล้วหายไปจากบัญชีถูกถอยเป็นตัวแรกโดย `currentOrg` ก่อนถึงตรงนี้แล้ว
         // ที่นี่จึงเจอ id ที่ไม่มีในรายการได้เฉพาะตอนรายการยังไม่มา
-        equal(PanelText.heading(orgs: orgs, current: "gone", hasKey: true), "TamaClaude",
+        equal(PanelText.heading(orgs: orgs, current: "gone", hasKey: true), "Perch",
               "an id we cannot name is not a name")
 
         expect(!PanelText.canSwitchOrg(orgs: [orgs[0]], hasKey: true), "one org is not a choice")

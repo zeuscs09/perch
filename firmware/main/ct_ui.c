@@ -1055,7 +1055,7 @@ static uint16_t usage_color(int percent)
 // สีของแถบ — แดงทันทีที่ใช้เร็วกว่าเวลาที่ผ่านไปในหน้าต่าง ไม่ต้องรอถึงเกณฑ์ %
 // "60% ตอนเหลือเวลาอีกครึ่ง" เป็นปัญหาคนละแบบกับ "60% ตอนหมดเวลาพอดี"
 // ต้องตรงกับ usage_bar_color ใน tools/gen/screen.py
-// และ MenuBadge.alarming ใน host/Sources/TamaCore/MenuBadge.swift (แถบเมนูใช้สูตร pace เดียวกัน แต่ไม่มีเกณฑ์ %)
+// และ MenuBadge.alarming ใน host/Sources/PerchCore/MenuBadge.swift (แถบเมนูใช้สูตร pace เดียวกัน แต่ไม่มีเกณฑ์ %)
 static uint16_t usage_bar_color(const ct_usage_t *u, int window)
 {
     if (u->percent < 0) return CT_COL_TEXT_DIM;
@@ -1332,7 +1332,7 @@ static void apply_link_label(void)
     if (s_link_ble) {
         // ชื่อสถานที่ชนะชื่อบอร์ด: ตอนต่อติดแล้ว "ต่อกับอะไรอยู่" ไม่ใช่คำถามอีกต่อไป
         // (ไอคอนข้างๆ ตอบให้แล้ว) พื้นที่ตรงนี้จึงมีค่ากว่าถ้าบอกอย่างอื่น
-        label = s_snap.place[0] ? s_snap.place : "tamaclaude";
+        label = s_snap.place[0] ? s_snap.place : "perch";
     } else if (s_link_wifi && s_link_ip[0]) {
         label = s_link_ip;
     }

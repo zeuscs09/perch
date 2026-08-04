@@ -2,14 +2,14 @@ import Foundation
 
 /// การ์ดโควตาหนึ่งใบใน popover — ทุกอย่างที่ต้องวาด ยกเว้นวิธีวาด
 ///
-/// อยู่ใน TamaCore ด้วยเหตุผลเดียวกับ `PanelText`: กฎว่าสีไหนขึ้นเมื่อไร ขีด pace
+/// อยู่ใน PerchCore ด้วยเหตุผลเดียวกับ `PanelText`: กฎว่าสีไหนขึ้นเมื่อไร ขีด pace
 /// อยู่ตรงไหน และเวลารีเซ็ตอ่านว่าอะไร เป็นตรรกะล้วนที่เทสต์ได้บนเครื่องที่ไม่มีจอ
 /// ส่วนที่เหลือ (`QuotaCardView`) เหลือแค่ "เอาค่าพวกนี้ไปวาด"
 ///
 /// ภาษาภาพเดียวกับแผงบนบอร์ด — เกณฑ์สีและสูตร pace ต้องตรงกับ `usage_bar_color`
 /// ใน `tools/gen/screen.py` และ `firmware/main/ct_ui.c`
 public struct QuotaCard: Equatable, Sendable {
-    /// ระดับที่สีอ่านออกมาได้ — ไม่ใช่ `NSColor` เพราะ TamaCore ไม่รู้จัก AppKit
+    /// ระดับที่สีอ่านออกมาได้ — ไม่ใช่ `NSColor` เพราะ PerchCore ไม่รู้จัก AppKit
     /// และเพราะ "ระดับ" คือสิ่งที่เทสต์ได้ ส่วน "สี" คือการตีความของมัน
     public enum Level: Sendable {
         case unknown, good, warn, crit

@@ -18,15 +18,15 @@ below it.
 ## Data flow
 
 ```
-Claude Code hooks --> tamaclaude --hook --> Unix socket --> daemon --> BLE GATT --> board
+Claude Code hooks --> perch --hook --> Unix socket --> daemon --> BLE GATT --> board
                                                                   \                  ^
                                                                    '-> sealed TCP ---'
                                                                        (only when BLE
                                                                         is 10 s gone)
 
-Claude Code statusline --> ~/.tamaclaude/statusline.sh --.
+Claude Code statusline --> ~/.perch/statusline.sh --.
                                                           >--> ~/.claude/.statusline-usage-cache
-menu bar timer --> tamaclaude --usage-poll --> claude.ai --'                |
+menu bar timer --> perch --usage-poll --> claude.ai --'                |
                                                         daemon reads --> "u" key --> board
 ```
 
@@ -36,7 +36,7 @@ the user's `sessionKey` and keeps the number moving with Claude Code closed. Nei
 the other and they are separate switches — see the reversal note in `DESIGN.md`.
 
 The daemon owns all logic. Firmware only knows a fixed `VisualState` enum and draws it.
-Tool-to-animation mapping is host-side and user-overridable at `~/.tamaclaude/tools.json`.
+Tool-to-animation mapping is host-side and user-overridable at `~/.perch/tools.json`.
 
 ## Commands
 
@@ -45,23 +45,23 @@ Tool-to-animation mapping is host-side and user-overridable at `~/.tamaclaude/to
 ```bash
 cd host
 swift build                        # debug
-swift run tamatest                 # run the whole test suite
-swift run tamaclaude --daemon --print --no-ble -v   # daemon without bluetooth, prints snapshots
-swift run tamaclaude --send '<json>'                # inject one hand-written hook event
-swift run tamaclaude --usage-poll                   # one quota fetch -> cache, then exit
-swift run tamaclaude --usage-cache < statusline.json  # the statusline pipe, by hand
-swift run tamaclaude --install-statusline           # take over statusLine.command
-swift run tamaclaude --remove-statusline            # give the slot back
-./Scripts/make-app.sh              # release .app -> host/dist/TamaClaude.app
+swift run perchtest                 # run the whole test suite
+swift run perch --daemon --print --no-ble -v   # daemon without bluetooth, prints snapshots
+swift run perch --send '<json>'                # inject one hand-written hook event
+swift run perch --usage-poll                   # one quota fetch -> cache, then exit
+swift run perch --usage-cache < statusline.json  # the statusline pipe, by hand
+swift run perch --install-statusline           # take over statusLine.command
+swift run perch --remove-statusline            # give the slot back
+./Scripts/make-app.sh              # release .app -> host/dist/Perch.app
 ./Scripts/make-app.sh --install    # install to /Applications and launch
 ```
 
-`--usage-poll` reads the key from `~/.tamaclaude/session-key` (mode 600, never argv, never env)
+`--usage-poll` reads the key from `~/.perch/session-key` (mode 600, never argv, never env)
 and exits: `0` = wrote the cache · `2` = key rejected · `3` = key file unusable · `1` = anything else.
 The menu bar app runs it on a timer; the key is set from its gear menu, not by hand.
 
-There is **no `testTarget`** and no per-test filter — `swift run tamatest` runs everything
-(`Sources/tamatest/Tests.swift`, grouped by `suite("...")`). A machine with only Command Line
+There is **no `testTarget`** and no per-test filter — `swift run perchtest` runs everything
+(`Sources/perchtest/Tests.swift`, grouped by `suite("...")`). A machine with only Command Line
 Tools would build a `testTarget` and exit 0 without running it, which is worse than no tests.
 To narrow the run, temporarily comment out `suite(...)` calls in `runAllTests()`.
 
@@ -107,43 +107,43 @@ look at `out/`. It proves the *design*, not the C renderer.
 - **Assets are rect lists**, `{x, y, w, h, color}` in mascot-relative *unit* coordinates —
   no bitmaps, no sprite pipeline. The preview and the board both come from `gen/mascot.py`.
   The **app icon is half an exception** — `.icns` carries per-size art, so ≥128 px is a
-  hand-drawn PNG (`docs/images/tamaclaude-logo.png`) and ≤64 px is drawn from the same rect
+  hand-drawn PNG (`docs/images/perch-logo.png`) and ≤64 px is drawn from the same rect
   list. See the reversal note in `DESIGN.md`.
 
 ### Host layout (`host/Sources/`)
 
 | File | Role |
 |---|---|
-| `TamaCore/Protocol.swift` | `HookEvent`, `VisualState` (+ `priority`), `Snapshot`, MTU squeeze |
-| `TamaCore/SessionStore.swift` | all the logic: hook → per-session state → snapshot |
-| `TamaCore/ToolMap.swift` | tool name → `VisualState`, overridable via `~/.tamaclaude/tools.json` |
-| `TamaCore/Text.swift` | strip to the board font's charset, then truncate |
-| `TamaCore/SocketServer.swift` / `HookClient.swift` | Unix socket between `--hook` and the daemon |
-| `TamaCore/BLETransport.swift` | CoreBluetooth central + auto-reconnect + board events |
-| `TamaCore/WiFiProvisioning.swift` | the Wi-Fi commands and reports that ride the config/event characteristics |
-| `TamaCore/LanFrame.swift` | the sealed frame on the wire: nonce, counter, greeting — pure, both directions |
-| `TamaCore/LanKey.swift` | the 32-byte LAN key: where it lives, how it is fingerprinted |
-| `TamaCore/LanTransport.swift` | the second path: find the board, connect, seal, resend |
-| `TamaCore/Failover.swift` | when the second path may open (10 s grace) + the composite transport |
-| `TamaCore/Usage{Reader,Writer}.swift` | the `.statusline-usage-cache` contract |
-| `TamaCore/UsagePoll.swift` | `--usage-poll`: one claude.ai quota fetch, then exit |
-| `TamaCore/UsagePoller.swift` | when to poll and what the last poll said — fed `tick(now:)`, owns no timer |
-| `TamaCore/SessionStarter.swift` | when the app may open a session of its own — same shape, plus the guards and what locks it |
-| `TamaCore/ChildOutput.swift` | what a child process said, drained off its pipe without blocking it |
-| `TamaCore/SessionKeyFile.swift` | writes `~/.tamaclaude/session-key` so it is mode 600 from birth |
-| `TamaCore/SessionKeyState.swift` | what the settings window says under the key button — saved is not the same as accepted |
-| `TamaCore/{Hook,Statusline}Installer.swift` | writes into `~/.claude/settings.json` |
-| `TamaCore/Paths.swift` | the `~/.tamaclaude` paths + `Log` (`settings.json` belongs to `HookInstaller`) |
-| `TamaCore/Daemon.swift` | wires it together + 1 s tick |
-| `TamaCore/MenuBadge.swift` | what the menu bar icon knows: percent + pace position |
-| `TamaCore/PanelText.swift` | what the foot of the popover says (board link, session rows, figure age) |
-| `TamaCore/QuotaCard.swift` | what a quota card says: colour level, pace tick, reset line |
-| `TamaCore/RefreshControl.swift` | the refresh button's discipline: cooldown, and when opening the panel polls |
-| `tamaclaude/MenuBarApp.swift` | the menu bar app **is** the daemon (Bluetooth TCC is per-`.app`) |
-| `tamaclaude/PreferencesWindowController.swift` | the settings window: General + Wi-Fi (the gear is down to Settings…/Quit) |
-| `tamaclaude/PanelViewController.swift` | the popover: header + gear, the cards, the foot |
-| `tamaclaude/QuotaCardView.swift` | how a quota card is drawn (bar, pace tick, palette) |
-| `tamaclaude/MenuBadgeImage.swift` | how the menu bar icon is drawn (template vs red) |
+| `PerchCore/Protocol.swift` | `HookEvent`, `VisualState` (+ `priority`), `Snapshot`, MTU squeeze |
+| `PerchCore/SessionStore.swift` | all the logic: hook → per-session state → snapshot |
+| `PerchCore/ToolMap.swift` | tool name → `VisualState`, overridable via `~/.perch/tools.json` |
+| `PerchCore/Text.swift` | strip to the board font's charset, then truncate |
+| `PerchCore/SocketServer.swift` / `HookClient.swift` | Unix socket between `--hook` and the daemon |
+| `PerchCore/BLETransport.swift` | CoreBluetooth central + auto-reconnect + board events |
+| `PerchCore/WiFiProvisioning.swift` | the Wi-Fi commands and reports that ride the config/event characteristics |
+| `PerchCore/LanFrame.swift` | the sealed frame on the wire: nonce, counter, greeting — pure, both directions |
+| `PerchCore/LanKey.swift` | the 32-byte LAN key: where it lives, how it is fingerprinted |
+| `PerchCore/LanTransport.swift` | the second path: find the board, connect, seal, resend |
+| `PerchCore/Failover.swift` | when the second path may open (10 s grace) + the composite transport |
+| `PerchCore/Usage{Reader,Writer}.swift` | the `.statusline-usage-cache` contract |
+| `PerchCore/UsagePoll.swift` | `--usage-poll`: one claude.ai quota fetch, then exit |
+| `PerchCore/UsagePoller.swift` | when to poll and what the last poll said — fed `tick(now:)`, owns no timer |
+| `PerchCore/SessionStarter.swift` | when the app may open a session of its own — same shape, plus the guards and what locks it |
+| `PerchCore/ChildOutput.swift` | what a child process said, drained off its pipe without blocking it |
+| `PerchCore/SessionKeyFile.swift` | writes `~/.perch/session-key` so it is mode 600 from birth |
+| `PerchCore/SessionKeyState.swift` | what the settings window says under the key button — saved is not the same as accepted |
+| `PerchCore/{Hook,Statusline}Installer.swift` | writes into `~/.claude/settings.json` |
+| `PerchCore/Paths.swift` | the `~/.perch` paths + `Log` (`settings.json` belongs to `HookInstaller`) |
+| `PerchCore/Daemon.swift` | wires it together + 1 s tick |
+| `PerchCore/MenuBadge.swift` | what the menu bar icon knows: percent + pace position |
+| `PerchCore/PanelText.swift` | what the foot of the popover says (board link, session rows, figure age) |
+| `PerchCore/QuotaCard.swift` | what a quota card says: colour level, pace tick, reset line |
+| `PerchCore/RefreshControl.swift` | the refresh button's discipline: cooldown, and when opening the panel polls |
+| `perch/MenuBarApp.swift` | the menu bar app **is** the daemon (Bluetooth TCC is per-`.app`) |
+| `perch/PreferencesWindowController.swift` | the settings window: General + Wi-Fi (the gear is down to Settings…/Quit) |
+| `perch/PanelViewController.swift` | the popover: header + gear, the cards, the foot |
+| `perch/QuotaCardView.swift` | how a quota card is drawn (bar, pace tick, palette) |
+| `perch/MenuBadgeImage.swift` | how the menu bar icon is drawn (template vs red) |
 
 ### Invariants worth knowing before you touch things
 
@@ -164,13 +164,13 @@ look at `out/`. It proves the *design*, not the C renderer.
   of both frames that used it, so `LanSealer` increments before sealing and the board rejects
   anything not strictly greater than what it has already accepted. The board tells the Mac
   where to continue from when it accepts the connection — neither side stores a counter file.
-- **The `sessionKey` is a full-account credential.** File only (`~/.tamaclaude/session-key`,
+- **The `sessionKey` is a full-account credential.** File only (`~/.perch/session-key`,
   mode 600), never argv, never env, never logged, re-read every poll. Not the Keychain: the
   adhoc signature changes cdhash on every build, so the item would prompt on every upgrade.
 - **`-v` and `-psn_*` are not modes.** LaunchServices appends `-psn_0_12345`; an app that
   rejects unknown args dies on double-click.
 - **The `VisualState` enum is a contract with the firmware.** Adding or reordering it means
-  changing `ct_model.c`/`ct_mascot.c` too. `tamatest` guards this.
+  changing `ct_model.c`/`ct_mascot.c` too. `perchtest` guards this.
 
 ### GATT
 
@@ -209,7 +209,7 @@ for byte.
 
 ### Issue tracker
 
-Issues live as GitHub issues in `thaitop/tamaclaude`, managed with the `gh` CLI. External PRs
+Issues live as GitHub issues in `zeuscs09/perch`, managed with the `gh` CLI. External PRs
 are not a triage surface. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels

@@ -12,7 +12,7 @@ public enum GATT {
     public static let event = CBUUID(string: "7A9B0004-4C1E-4B6D-9E2A-1D5C3F0A0004")
 
     /// ชื่อที่บอร์ดโฆษณา ใช้เป็นตัวกรองสำรองเมื่อ advertisement ไม่ประกาศ service
-    public static let deviceName = "tamaclaude"
+    public static let deviceName = "perch"
 }
 
 /// บอร์ดหนึ่งตัวที่สแกนเจอ
@@ -49,7 +49,7 @@ public final class BLETransport: NSObject, Transport {
     private var peripheral: CBPeripheral?
     private var stateChar: CBCharacteristic?
     private var configChar: CBCharacteristic?
-    private let queue = DispatchQueue(label: "tamaclaude.ble")
+    private let queue = DispatchQueue(label: "perch.ble")
     /// snapshot ล่าสุด เก็บไว้ยิงซ้ำทันทีที่ต่อติด
     private var pending: Data?
     private var writeLimit = Wire.maxPayload

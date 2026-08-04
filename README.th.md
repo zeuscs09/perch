@@ -1,11 +1,12 @@
 <p align="center">
-  <img src="docs/images/tamaclaude-logo.png" alt="" width="128">
+  <img src="docs/images/perch-logo.png" alt="" width="128">
 </p>
 
-<h1 align="center">TamaClaude</h1>
+<h1 align="center">Perch</h1>
 
 <p align="center">
-  <strong>Tamagotchi + Claude</strong> — สัตว์เลี้ยงเสมือนที่อารมณ์ของมันคือ session เขียนโค้ดของคุณ
+  <strong>จอเล็กๆ ที่เกาะอยู่บนโต๊ะ</strong> — คอยบอกว่า agent ที่รันอยู่กำลังทำอะไร
+  โดยไม่ต้องเสียพื้นที่หน้าจอให้มัน
 </p>
 
 <p align="center">
@@ -101,8 +102,8 @@
 
 ```bash
 xcode-select --install
-git clone https://github.com/thaitop/tamaclaude.git
-cd tamaclaude
+git clone https://github.com/zeuscs09/perch.git
+cd perch
 ```
 
 ## 2. เอา firmware ลงบอร์ด
@@ -121,14 +122,14 @@ echo "$PORT"
 
 ### ทาง A — แฟลชไฟล์สำเร็จรูป (ไม่ต้องลง ESP-IDF)
 
-โหลด `tamaclaude-esp32-*.bin` จาก
-[release ล่าสุด](https://github.com/thaitop/tamaclaude/releases/latest) เป็นไฟล์เดียวราว 1 MB
+โหลด `perch-esp32-*.bin` จาก
+[release ล่าสุด](https://github.com/zeuscs09/perch/releases/latest) เป็นไฟล์เดียวราว 1 MB
 รวม bootloader, partition table และตัวแอปไว้ครบแล้ว
 
 ```bash
 python3 -m pip install esptool
 python3 -m esptool --chip esp32 --port "$PORT" \
-    write_flash 0x0 ~/Downloads/tamaclaude-esp32-1.0.4.bin
+    write_flash 0x0 ~/Downloads/perch-esp32-1.0.4.bin
 ```
 
 เท่านี้จบ — Python ราว 10 MB ไม่ต้องมีคอมไพเลอร์ ข้ามไปขั้นที่ 3 ได้เลย
@@ -167,7 +168,7 @@ idf.py -p "$PORT" flash monitor
 
 ### ไม่ว่าจะทางไหน
 
-จอจะติดและบอร์ดจะเริ่มประกาศตัวบน Bluetooth ในชื่อ `tamaclaude-3f7a` — ส่วนท้ายมาจาก MAC address
+จอจะติดและบอร์ดจะเริ่มประกาศตัวบน Bluetooth ในชื่อ `perch-3f7a` — ส่วนท้ายมาจาก MAC address
 ของมัน จึงใช้แยกบอร์ดสองตัวออกจากกันได้ ถ้าเปิด `idf.py monitor` ค้างไว้จะเห็นตอนมันเกิดขึ้น
 กด `Ctrl+]` เพื่อออก
 
@@ -178,7 +179,7 @@ cd ../host
 ./Scripts/make-app.sh --install
 ```
 
-คำสั่งนี้บิลด์ `TamaClaude.app` ก๊อปไป `/Applications` แล้วเปิดให้เลย macOS จะขอสิทธิ์ Bluetooth
+คำสั่งนี้บิลด์ `Perch.app` ก๊อปไป `/Applications` แล้วเปิดให้เลย macOS จะขอสิทธิ์ Bluetooth
 ครั้งแรก — ต้องอนุญาต ไม่งั้นแอปจะมองไม่เห็นบอร์ดตลอดไป
 
 ไอคอนมาสคอตเล็กๆ จะโผล่บนแถบเมนู คลิกเพื่อดูแผงโควตา คลิกรูปเฟืองเพื่อตั้งค่า
@@ -210,7 +211,7 @@ cd ../host
 
 > **เรื่อง session key** มันคือคุกกี้ `sessionKey` ของเบราว์เซอร์ที่ล็อกอิน claude.ai อยู่ และเป็น
 > **รหัสผ่านระดับทั้งบัญชี** — ใครถือไปก็ทำอะไรในนามบัญชีคุณได้ แอปเก็บมันไว้ที่
-> `~/.tamaclaude/session-key` โหมด 600 และไม่เคยใส่มันลงบรรทัดคำสั่ง ตัวแปรสภาพแวดล้อม
+> `~/.perch/session-key` โหมด 600 และไม่เคยใส่มันลงบรรทัดคำสั่ง ตัวแปรสภาพแวดล้อม
 > หรือไฟล์ล็อก ถอนออกเมื่อไหร่ก็ได้ด้วยการลบไฟล์นั้น และเพิกถอนตัวคีย์ด้วยการล็อกเอาต์ claude.ai
 > จากเบราว์เซอร์ที่คุณก๊อปมา ถ้าไม่สบายใจก็ข้ามไปได้ — ท่อ statusline ด้านบนก็มีตัวเลขให้ดูอยู่แล้ว
 >
@@ -282,8 +283,18 @@ macOS 15 ขึ้นไปขอสิทธิ์ Local Network แยกอ�
 
 - **macOS เท่านั้น** แอปที่คุยกับ Claude Code เป็นแอปแถบเมนูภาษา Swift ยังไม่มีตัวสำหรับ Linux หรือ Windows
 - **ไม่มีอัปเดตผ่านอากาศ** firmware ตัวใหม่แปลว่าต้องเสียบสาย USB อีกครั้ง
-- **จอสัมผัสกับลำโพงยังไม่ได้ใช้** จอตัวนี้สัมผัสได้และบอร์ดมีขาลำโพง แต่ยังไม่ได้ต่อทั้งคู่
+- **ลำโพงยังไม่ได้ใช้** บอร์ดมีขาลำโพงมาให้ แต่ยังไม่ได้ต่ออะไรเข้าไป
 - **เซ็นแบบ adhoc** แอปไม่ได้ notarise จึงเป็นของที่บิลด์ทีละเครื่อง ไม่ใช่ของที่ส่งต่อกันได้
+
+## เครดิต
+
+Perch แยกตัวออกมาจาก [TamaClaude](https://github.com/thaitop/tamaclaude) ของ Uthai Moolpak
+ซึ่งเป็นที่มาของการปลุกบอร์ด ตัววาดสี่เหลี่ยม และโพรโทคอล BLE
+
+ที่เปลี่ยนชื่อเพราะสิ่งที่มันทำห่างจาก "เลี้ยงสัตว์เลี้ยงเสมือน" ไปไกลมากแล้ว
+ตอนนี้มันคือจอบอกสถานะ นาฬิกา และแผงพยากรณ์อากาศ ที่บังเอิญรู้ว่า agent ของเรากำลังทำอะไรอยู่
+
+ส่วนที่แก้แล้วใช้ได้กับทั้งสองโครงการยังส่งกลับไปเป็น pull request ให้ต้นทางเหมือนเดิม
 
 ## สัญญาอนุญาต
 

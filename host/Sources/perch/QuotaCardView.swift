@@ -1,11 +1,11 @@
 import AppKit
-import TamaCore
+import PerchCore
 
 /// การ์ดโควตาหนึ่งใบ — หัวแถว, คำอธิบาย, แถบพร้อมขีด pace, แล้วเวลารีเซ็ต
 ///
 /// อยู่คนละไฟล์กับ `PanelViewController` ด้วยเหตุผลเดียวกับ `MenuBadgeImage`:
 /// ไฟล์นั้นเปลี่ยนเมื่อโครงของแผงเปลี่ยน ไฟล์นี้เปลี่ยนเมื่อหน้าตาของการ์ดเปลี่ยน
-/// สิ่งที่*พูด* อยู่ที่ `QuotaCard` ใน TamaCore ที่นี่มีแต่วิธีวาด
+/// สิ่งที่*พูด* อยู่ที่ `QuotaCard` ใน PerchCore ที่นี่มีแต่วิธีวาด
 final class QuotaCardView: NSView {
     /// สามขั้นเดียวกับบอร์ด แต่ใช้สีของระบบ ไม่ใช่ค่าจาก `tools/layout.toml`
     ///

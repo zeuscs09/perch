@@ -276,9 +276,9 @@ public enum PollProcess {
             // org id ไม่ใช่ความลับ จึงส่งทางนี้ได้ และลูกยัง validate ซ้ำอยู่ดี
             var env = ProcessInfo.processInfo.environment
             if let orgID, !orgID.isEmpty {
-                env["TAMACLAUDE_ORG_ID"] = orgID
+                env["PERCH_ORG_ID"] = orgID
             } else {
-                env.removeValue(forKey: "TAMACLAUDE_ORG_ID")
+                env.removeValue(forKey: "PERCH_ORG_ID")
             }
             process.environment = env
 

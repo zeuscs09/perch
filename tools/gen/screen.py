@@ -30,7 +30,7 @@ def font(size: int) -> ImageFont.FreeTypeFont:
 def _ascii_only(**fields: str) -> None:
     """กันข้อความสาธิตที่ฟอนต์บนบอร์ดวาดไม่ได้ — จะได้กล่องสี่เหลี่ยมแทน
 
-    ข้อความจริงผ่าน Text.sanitize ฝั่ง daemon (host/Sources/TamaCore/Text.swift)
+    ข้อความจริงผ่าน Text.sanitize ฝั่ง daemon (host/Sources/PerchCore/Text.swift)
     มาแล้ว จอจึงเห็นแค่ ASCII 0x20..0x7E เสมอ ถ้า preview ยอมให้ใส่ em dash ได้
     ภาพที่ออกมาจะสวยกว่าของจริง ซึ่งแย่กว่าการพังตรงนี้
     """
@@ -163,7 +163,7 @@ def _link_label(s: Screen) -> str:
     """
     if not s.ble_link:
         return s.ip if (s.wifi and s.ip) else "no link"
-    label = s.place or "tamaclaude"
+    label = s.place or "perch"
     if s.temperature is not None:
         return f"{label}  {s.temperature}\u00b0"
     return label
@@ -391,7 +391,7 @@ def usage_bar_color(u: Usage) -> str:
 
     "60% ตอนเหลือเวลาอีกครึ่ง" เป็นปัญหาคนละแบบกับ "60% ตอนหมดเวลาพอดี"
     ต้องตรงกับ usage_bar_color ใน firmware/main/ct_ui.c
-    และ MenuBadge.alarming ใน host/Sources/TamaCore/MenuBadge.swift (แถบเมนูใช้สูตร pace เดียวกัน แต่ไม่มีเกณฑ์ %)
+    และ MenuBadge.alarming ใน host/Sources/PerchCore/MenuBadge.swift (แถบเมนูใช้สูตร pace เดียวกัน แต่ไม่มีเกณฑ์ %)
     """
     if u.pct is None:
         return PAL.text_dim

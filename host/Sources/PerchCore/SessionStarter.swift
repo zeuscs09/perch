@@ -196,7 +196,7 @@ public enum ClaudeBinary {
 
     /// path ที่ผู้ใช้ชี้เอง — ไม่มี UI โดยตั้งใจ
     ///
-    ///     defaults write com.tamaclaude.daemon claudePath /where/claude/is
+    ///     defaults write com.perch.daemon claudePath /where/claude/is
     ///
     /// คนที่ต้องใช้คือคนที่ติดตั้งนอกสี่ที่ข้างล่าง ซึ่งน้อยเกินกว่าจะกินที่ถาวรในเมนู
     public static let overrideKey = "claudePath"

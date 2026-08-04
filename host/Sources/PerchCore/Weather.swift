@@ -173,7 +173,7 @@ public enum Weather {
         guard let url = comps.url else { return [] }
 
         var request = URLRequest(url: url, timeoutInterval: timeout)
-        request.setValue("tamaclaude", forHTTPHeaderField: "User-Agent")
+        request.setValue("perch", forHTTPHeaderField: "User-Agent")
 
         guard let (data, response) = try? await session.data(for: request),
             let http = response as? HTTPURLResponse, http.statusCode == 200,
@@ -212,7 +212,7 @@ public enum Weather {
         guard let url = comps.url else { return nil }
 
         var request = URLRequest(url: url, timeoutInterval: timeout)
-        request.setValue("tamaclaude", forHTTPHeaderField: "User-Agent")
+        request.setValue("perch", forHTTPHeaderField: "User-Agent")
 
         guard let (data, response) = try? await session.data(for: request),
             let http = response as? HTTPURLResponse, http.statusCode == 200,

@@ -2,8 +2,8 @@
 //
 // รูปแบบบนสาย (คีย์สั้นเพราะต้องพอดี 1 MTU):
 //   {"c":"14:32","d":"Mon 27 Jul","o":0,
-//    "s":[{"p":"tamaclaude","s":"building"}],
-//    "n":[{"t":"tamaclaude","b":"allow Bash?","k":"alert"}],"m":0,
+//    "s":[{"p":"perch","s":"building"}],
+//    "n":[{"t":"perch","b":"allow Bash?","k":"alert"}],"m":0,
 //    "u":[[35,10800],[48,111600]]}
 #pragma once
 

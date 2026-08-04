@@ -22,7 +22,7 @@ public enum SessionKeyFile {
         let dir = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
-        let tmp = dir.appendingPathComponent(".\(url.lastPathComponent).tamaclaude.tmp")
+        let tmp = dir.appendingPathComponent(".\(url.lastPathComponent).perch.tmp")
         try? FileManager.default.removeItem(at: tmp)
         guard FileManager.default.createFile(
             atPath: tmp.path, contents: Data(key.utf8), attributes: [.posixPermissions: 0o600])

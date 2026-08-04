@@ -34,7 +34,7 @@ public enum ProcessTree {
     /// ไม่ใช่ "claude" และเปลี่ยนทุกครั้งที่อัปเดต · สิ่งที่นิ่งคือ *คอมโพเนนต์* `claude`
     /// ในพาธ ซึ่งครอบคลุมทั้งแบบนั้นและ `/opt/homebrew/bin/claude`
     ///
-    /// เทียบทั้งคอมโพเนนต์ ไม่ใช่ `contains` เพราะไบนารีของเราเองอยู่ใน `tamaclaude/`
+    /// เทียบทั้งคอมโพเนนต์ ไม่ใช่ `contains` เพราะไบนารีของเราเองอยู่ใน `perch/`
     /// ซึ่ง `contains("claude")` จะจริงด้วย แล้วเราจะไปคว้า wrapper ของตัวเองมาเป็นเจ้าของ
     private static func isClaude(pid: Int32, comm: String) -> Bool {
         if let path = executablePath(pid) {

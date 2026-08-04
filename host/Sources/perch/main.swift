@@ -1,23 +1,23 @@
 import Foundation
-import TamaCore
+import PerchCore
 
 let usage = """
-tamaclaude — Claude Code session display for the CYD board
+perch — Claude Code session display for the CYD board
 
 usage:
-  tamaclaude                     menu bar app (runs the daemon itself)
-  tamaclaude --hook              read one hook event on stdin, forward to the daemon
-  tamaclaude --daemon [options]  run the daemon
-  tamaclaude --install-hooks     write the hook entries into ~/.claude/settings.json
-  tamaclaude --install-statusline  take over statusLine.command to capture rate_limits
-  tamaclaude --remove-statusline   give the statusLine slot back to the previous command
-  tamaclaude --usage-cache       read statusline JSON on stdin, write the usage cache
-  tamaclaude --usage-poll        ask claude.ai for the quota once, write the cache, exit
-  tamaclaude --send <json>       send one hand-written event (for testing)
+  perch                     menu bar app (runs the daemon itself)
+  perch --hook              read one hook event on stdin, forward to the daemon
+  perch --daemon [options]  run the daemon
+  perch --install-hooks     write the hook entries into ~/.claude/settings.json
+  perch --install-statusline  take over statusLine.command to capture rate_limits
+  perch --remove-statusline   give the statusLine slot back to the previous command
+  perch --usage-cache       read statusline JSON on stdin, write the usage cache
+  perch --usage-poll        ask claude.ai for the quota once, write the cache, exit
+  perch --send <json>       send one hand-written event (for testing)
 
 --usage-poll:
-  reads the claude.ai sessionKey from ~/.tamaclaude/session-key (mode 600, never argv).
-  set TAMACLAUDE_ORG_ID to pin an organization instead of discovering one.
+  reads the claude.ai sessionKey from ~/.perch/session-key (mode 600, never argv).
+  set PERCH_ORG_ID to pin an organization instead of discovering one.
   prints one `org <id> <name>` line per organization, then a status line.
   exit 0 wrote the cache · 2 the key was rejected · 3 the key file is unusable · 1 other
   the menu bar app runs this for you on a timer; set the key from its gear menu.

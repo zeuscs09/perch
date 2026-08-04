@@ -53,7 +53,7 @@ public enum HookInstaller {
                 root = obj
             }
             // สำรองไว้ก่อนเสมอ ไฟล์นี้ผู้ใช้แก้เองมาแล้วแน่ๆ
-            try? data.write(to: settingsPath.appendingPathExtension("tamaclaude.bak"))
+            try? data.write(to: settingsPath.appendingPathExtension("perch.bak"))
         }
 
         var hooks = root["hooks"] as? [String: Any] ?? [:]
@@ -62,7 +62,7 @@ public enum HookInstaller {
             let already = entries.contains { entry in
                 let inner = entry["hooks"] as? [[String: Any]] ?? []
                 return inner.contains { ($0["command"] as? String)?.contains("--hook") == true
-                    && ($0["command"] as? String)?.contains("tamaclaude") == true }
+                    && ($0["command"] as? String)?.contains("perch") == true }
             }
             if already {
                 // อัปเดตพาธให้ตรงกับ binary ปัจจุบัน แทนที่จะเพิ่มซ้ำ
@@ -71,7 +71,7 @@ public enum HookInstaller {
                     let inner = (entry["hooks"] as? [[String: Any]] ?? []).map { h -> [String: Any] in
                         var h = h
                         if let c = h["command"] as? String,
-                            c.contains("tamaclaude"), c.contains("--hook") {
+                            c.contains("perch"), c.contains("--hook") {
                             h["command"] = command
                         }
                         return h

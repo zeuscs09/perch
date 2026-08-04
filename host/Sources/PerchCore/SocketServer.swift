@@ -7,7 +7,7 @@ import Foundation
 /// โปรโตคอล: หนึ่งเหตุการณ์ = หนึ่งบรรทัด JSON แล้วปิดสายได้เลย
 public final class SocketServer {
     private let path: String
-    private let queue = DispatchQueue(label: "tamaclaude.socket")
+    private let queue = DispatchQueue(label: "perch.socket")
     private var listenFD: Int32 = -1
     private var source: DispatchSourceRead?
     private let onLine: (Data) -> Void

@@ -2,7 +2,7 @@ import Foundation
 
 /// ข้อความท้าย popover — สถานะบอร์ดกับรายการ session
 ///
-/// อยู่ใน TamaCore ไม่ใช่ใน MenuBarApp เพราะเป็นตรรกะล้วนที่เทสต์ได้ ส่วนที่เหลือของ
+/// อยู่ใน PerchCore ไม่ใช่ใน MenuBarApp เพราะเป็นตรรกะล้วนที่เทสต์ได้ ส่วนที่เหลือของ
 /// popover เป็น AppKit ที่เทสต์ไม่ได้บนเครื่องที่ไม่มีหน้าจอ แยกออกมาแล้วเส้นแบ่ง
 /// ระหว่าง "สิ่งที่พูด" กับ "วิธีวาด" ก็ชัดขึ้นด้วย
 public enum PanelText {
@@ -21,7 +21,7 @@ public enum PanelText {
     }
 
     /// ชื่อแอปตอนยังไม่มี org ให้พูดถึง — ไม่ใช่ที่ว่าง ไม่ใช่ `—`
-    public static let appName = "TamaClaude"
+    public static let appName = "Perch"
 
     /// ชื่อรายการ "ลิงก์โปรเจกต์" ในเมนูเฟือง — ข้อความ *คือ* ปลายทาง ไม่ใช่คำว่า "GitHub"
     /// ที่ซ่อนพาธไว้ ผู้ใช้ที่กำลังจะให้ credential กับแอปนี้ควรอ่านออกว่ามันจะพาไปไหนก่อนกด
@@ -29,7 +29,7 @@ public enum PanelText {
     /// ไม่มี scheme เพราะ `https://` ไม่ได้บอกอะไรที่ปลายทางอื่นไม่มีเหมือนกัน — ส่วนที่
     /// ต่างกันคือส่วนที่เหลือ · อยู่ใน `PanelText` แม้จะเป็นรายการในเมนู เพราะเมนูเฟือง
     /// เป็นส่วนหนึ่งของแผง (ดู `DESIGN.md`: ของที่ต้องมองอยู่บนแผง ของที่ต้องกดอยู่หลังเฟือง)
-    public static let projectLink = "github.com/thaitop/tamaclaude"
+    public static let projectLink = "github.com/zeuscs09/perch"
 
     public static var projectURL: URL? { URL(string: "https://" + projectLink) }
 
@@ -93,7 +93,7 @@ public enum PanelText {
             // ชื่อคีย์มาจากที่เดียวกับที่โค้ดอ่านมันจริง — คำสั่งที่ผู้ใช้ก็อปไปวางแล้วไม่มีผล
             // เพราะมีคนเปลี่ยนชื่อคีย์ คือคำแนะนำที่แย่กว่าไม่แนะนำอะไรเลย
             return (["Looked in:"] + searched).joined(separator: "\n")
-                + "\n\ndefaults write com.tamaclaude.daemon \(ClaudeBinary.overrideKey) <path>"
+                + "\n\ndefaults write com.perch.daemon \(ClaudeBinary.overrideKey) <path>"
         case .notLoggedIn:
             return "Run claude in a terminal and log in, then switch auto-start off and on again."
         case nil:

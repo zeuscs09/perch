@@ -1,11 +1,12 @@
 <p align="center">
-  <img src="docs/images/tamaclaude-logo.png" alt="" width="128">
+  <img src="docs/images/perch-logo.png" alt="" width="128">
 </p>
 
-<h1 align="center">TamaClaude</h1>
+<h1 align="center">Perch</h1>
 
 <p align="center">
-  <strong>Tamagotchi + Claude</strong> — a virtual pet whose moods are your coding sessions.
+  <strong>A little screen that perches on your desk</strong> — what your coding agents are
+  doing, without giving up a window for it.
 </p>
 
 <p align="center">
@@ -105,8 +106,8 @@ step 2 has both routes.
 
 ```bash
 xcode-select --install
-git clone https://github.com/thaitop/tamaclaude.git
-cd tamaclaude
+git clone https://github.com/zeuscs09/perch.git
+cd perch
 ```
 
 ## 2. Put the firmware on the board
@@ -128,14 +129,14 @@ again.
 
 ### Option A — flash a ready-made image (no ESP-IDF)
 
-Download `tamaclaude-esp32-*.bin` from the
-[latest release](https://github.com/thaitop/tamaclaude/releases/latest). It is one file,
+Download `perch-esp32-*.bin` from the
+[latest release](https://github.com/zeuscs09/perch/releases/latest). It is one file,
 about 1 MB, containing the bootloader, the partition table and the app.
 
 ```bash
 python3 -m pip install esptool
 python3 -m esptool --chip esp32 --port "$PORT" \
-    write_flash 0x0 ~/Downloads/tamaclaude-esp32-1.0.4.bin
+    write_flash 0x0 ~/Downloads/perch-esp32-1.0.4.bin
 ```
 
 That is the whole toolchain: about 10 MB of Python, no compiler. Skip to step 3.
@@ -176,7 +177,7 @@ is the authority.
 ### Either way
 
 The screen lights up and the board starts announcing itself over Bluetooth as
-`tamaclaude-3f7a` — the last part comes from its MAC address, so you can tell two boards
+`perch-3f7a` — the last part comes from its MAC address, so you can tell two boards
 apart. With `idf.py monitor` running you can watch it happen; press `Ctrl+]` to leave.
 
 ## 3. Install the Mac app
@@ -186,7 +187,7 @@ cd ../host
 ./Scripts/make-app.sh --install
 ```
 
-This builds `TamaClaude.app`, copies it to `/Applications`, and launches it. macOS asks
+This builds `Perch.app`, copies it to `/Applications`, and launches it. macOS asks
 for Bluetooth permission the first time — say yes, or the app can never see the board.
 
 A small mascot icon appears in your menu bar. Click it for the quota panel; click the
@@ -223,7 +224,7 @@ The bars at the bottom of the screen have two independent sources, both optional
 
 > **About the session key.** It is the `sessionKey` cookie of a logged-in claude.ai
 > browser session, and it is a **full-account credential** — anyone holding it can act as
-> your account. The app stores it in `~/.tamaclaude/session-key` with mode 600 and never
+> your account. The app stores it in `~/.perch/session-key` with mode 600 and never
 > puts it in a command line, an environment variable, or a log. Take it out at any time
 > by deleting that file, and revoke it by logging out of claude.ai in the browser you
 > copied it from. If you would rather not, skip this — the statusline route above still
@@ -307,10 +308,17 @@ Security ▸ Local Network.
 - **macOS only.** The app that talks to Claude Code is a Swift menu bar app; there is no
   Linux or Windows build.
 - **No over-the-air updates.** New firmware means plugging the USB cable back in.
-- **The touchscreen and speaker are unused.** The panel is touch-capable and the board has
-  a speaker pin; neither is wired up yet.
+- **The speaker is unused.** The board has a speaker pin; nothing is wired up to it yet.
 - **Ad-hoc signing.** The app is not notarised, so it is built per-machine rather than
   handed around.
+
+## Credit
+
+Perch is a fork of [TamaClaude](https://github.com/thaitop/tamaclaude) by Uthai Moolpak,
+which is where the board bring-up, the rectangle renderer, and the BLE protocol came from.
+It was renamed because what it does drifted a long way from raising a virtual pet: it is
+now a status display, a clock, and a weather panel that happens to know about your agents.
+Fixes that apply to both projects still go upstream as pull requests.
 
 ## License
 

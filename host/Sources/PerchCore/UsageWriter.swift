@@ -199,7 +199,7 @@ public enum UsageWriter {
     /// การ rename เป็น operation เดียว จึงไม่มีใครอ่านเจอไฟล์ที่เขียนค้างครึ่งทาง
     static func write(_ text: String, to url: URL) {
         let tmp = url.deletingLastPathComponent()
-            .appendingPathComponent(".\(url.lastPathComponent).tamaclaude.tmp")
+            .appendingPathComponent(".\(url.lastPathComponent).perch.tmp")
         guard (try? text.write(to: tmp, atomically: false, encoding: .utf8)) != nil else { return }
         try? FileManager.default.setAttributes(
             [.posixPermissions: 0o600], ofItemAtPath: tmp.path)

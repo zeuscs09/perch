@@ -1,8 +1,8 @@
 #!/bin/bash
-# ประกอบ TamaClaude-<version>.dmg สำหรับแจกจ่าย
+# ประกอบ Perch-<version>.dmg สำหรับแจกจ่าย
 #
 #   ./Scripts/make-dmg.sh                    บิลด์ .app ใหม่แล้วห่อเป็น dmg ไว้ที่ host/dist/
-#   ./Scripts/make-dmg.sh --skip-build       ใช้ dist/TamaClaude.app ที่มีอยู่แล้ว
+#   ./Scripts/make-dmg.sh --skip-build       ใช้ dist/Perch.app ที่มีอยู่แล้ว
 #
 # เซ็นด้วย Developer ID (ถ้ามีบัญชีนักพัฒนา) แล้วส่ง notarize:
 #   SIGN_ID="Developer ID Application: ชื่อคุณ (TEAMID)" \
@@ -23,7 +23,7 @@ for arg in "$@"; do
     esac
 done
 
-APP="dist/TamaClaude.app"
+APP="dist/Perch.app"
 
 if [ "$SKIP_BUILD" = "0" ]; then
     ./Scripts/make-app.sh
@@ -33,8 +33,8 @@ elif [ ! -d "$APP" ]; then
 fi
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
-VOLNAME="TamaClaude $VERSION"
-DMG="dist/TamaClaude-$VERSION.dmg"
+VOLNAME="Perch $VERSION"
+DMG="dist/Perch-$VERSION.dmg"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"; hdiutil detach "/Volumes/$VOLNAME" -quiet 2>/dev/null || true' EXIT
 
@@ -42,7 +42,7 @@ trap 'rm -rf "$STAGE"; hdiutil detach "/Volumes/$VOLNAME" -quiet 2>/dev/null || 
 # ต้องมี --options runtime ไม่งั้น notarytool ปฏิเสธ (hardened runtime บังคับตั้งแต่ปี 2019)
 if [ -n "${SIGN_ID:-}" ]; then
     codesign --force --deep --options runtime --timestamp \
-        --sign "$SIGN_ID" --identifier com.tamaclaude.daemon "$APP"
+        --sign "$SIGN_ID" --identifier com.perch.daemon "$APP"
     echo "signed $APP with $SIGN_ID"
 fi
 
@@ -70,7 +70,7 @@ tell application "Finder"
         set opts to the icon view options of container window
         set arrangement of opts to not arranged
         set icon size of opts to 128
-        set position of item "TamaClaude.app" of container window to {150, 190}
+        set position of item "Perch.app" of container window to {150, 190}
         set position of item "Applications" of container window to {450, 190}
         close
         open

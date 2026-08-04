@@ -5,7 +5,7 @@ import Foundation
 /// ทุกอย่างวิ่งบนคิวเดียว (`work`) สถานะจึงไม่ต้องล็อก
 public final class Daemon {
     private let store: SessionStore
-    private let work = DispatchQueue(label: "tamaclaude.daemon")
+    private let work = DispatchQueue(label: "perch.daemon")
     private var server: SocketServer?
     private var transports: [Transport]
     private var timer: DispatchSourceTimer?

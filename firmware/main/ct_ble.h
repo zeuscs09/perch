@@ -1,6 +1,6 @@
 // GATT peripheral — daemon ฝั่ง Mac เป็น central
 //
-// UUID ต้องตรงกับ host/Sources/TamaCore/BLETransport.swift ทุกตัว
+// UUID ต้องตรงกับ host/Sources/PerchCore/BLETransport.swift ทุกตัว
 //   service  7A9B0001-4C1E-4B6D-9E2A-1D5C3F0A0001
 //   state    ...0002  daemon เขียน snapshot ลงตัวนี้
 //   config   ...0003  ความสว่าง + คำสั่ง WiFi — **บังคับเข้ารหัส** เพราะรหัส WiFi
@@ -24,7 +24,7 @@ void ct_ble_init(const ct_ble_cbs_t *cbs);
 // เรียกจากเธรดไหนก็ได้ (NimBLE ล็อกเอง) แต่ข้อความต้องพอดี MTU เดียว ไม่มีการต่อชิ้น
 void ct_ble_notify(const char *json, int len);
 
-// ชื่อที่บอร์ดโฆษณา (`tamaclaude-ab12`) — mDNS ใช้ชื่อเดียวกันนี้ ไม่ใช่ชื่อของตัวเอง
+// ชื่อที่บอร์ดโฆษณา (`perch-ab12`) — mDNS ใช้ชื่อเดียวกันนี้ ไม่ใช่ชื่อของตัวเอง
 // เพราะผู้ใช้ที่มีสองบอร์ดต้องแยกออกด้วยชื่อชุดเดียว ไม่ใช่สองชุดที่ไม่เกี่ยวกัน
 // ก่อน `ct_ble_init` จะซิงก์เสร็จจะได้ชื่อสั้นที่ยังไม่มีเลข MAC ต่อท้าย
 const char *ct_ble_name(void);

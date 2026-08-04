@@ -26,7 +26,7 @@ from PIL import Image, ImageDraw  # noqa: E402
 from gen import mascot  # noqa: E402
 from gen.config import PAL, REPO_DIR  # noqa: E402
 
-SRC = REPO_DIR / "docs" / "images" / "tamaclaude-logo.png"
+SRC = REPO_DIR / "docs" / "images" / "perch-logo.png"
 OUT = REPO_DIR / "host" / "Resources" / "AppIcon.icns"
 
 # macOS เว้นขอบรอบไอคอนราว 10% ของด้าน ไอคอนที่ชิดขอบจะดูใหญ่ผิดพวกบน Dock
