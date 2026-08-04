@@ -106,9 +106,11 @@ look at `out/`. It proves the *design*, not the C renderer.
   sides; the Python side is where you iterate, the C side is the port.
 - **Assets are rect lists**, `{x, y, w, h, color}` in mascot-relative *unit* coordinates —
   no bitmaps, no sprite pipeline. The preview and the board both come from `gen/mascot.py`.
-  The **app icon is half an exception** — `.icns` carries per-size art, so ≥128 px is a
-  hand-drawn PNG (`docs/images/perch-logo.png`) and ≤64 px is drawn from the same rect
-  list. See the reversal note in `DESIGN.md`.
+  **No exceptions, including the app icon** — `tools/make_logo.py` draws
+  `docs/images/perch-logo.png` from the same rect list, and `make_icon.py` turns that plus a
+  separate small-size drawing into `.icns` (`.icns` carries per-size art, so ≤64 px is drawn
+  again rather than scaled down). Regenerate with `python3 tools/make_logo.py`. This was a
+  hand-drawn PNG for one release; see the reversal note in `DESIGN.md` for why it came back.
 
 ### Host layout (`host/Sources/`)
 

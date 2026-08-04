@@ -105,6 +105,8 @@ class Screen:
     weather: str = "clear"
     # ภาระเครื่อง (cpu%, mem%) — ช่องที่ 4 ของตาราง วาดคนละแบบกับโควตา
     machine: tuple[int, int] | None = None
+    # โหมดกลางคืน (สามทุ่ม–เจ็ดโมง) — ทั้งจอเป็นของนาฬิกา ที่เหลือหายหมด
+    night: bool = False
 
     @property
     def ble_link(self) -> bool:
@@ -557,12 +559,75 @@ def _idle_clock(draw: ImageDraw.ImageDraw, s: Screen) -> None:
                   fill=quantize565(PAL.text_dim), anchor="mm")
 
 
+# --- นาฬิกาโหมดกลางคืน ------------------------------------------------------
+# ต้องตรงกับ draw_big_clock ใน firmware/main/pch_ui.c ทุกตัวเลข
+BC_W, BC_H, BC_T, BC_GAP, BC_COLON = 58, 104, 14, 10, 14
+# บิต: 0=บน 1=ขวาบน 2=ขวาล่าง 3=ล่าง 4=ซ้ายล่าง 5=ซ้ายบน 6=กลาง
+BC_SEG = (0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F)
+
+
+def _big_digit(draw: ImageDraw.ImageDraw, x: int, y: int, d: int, col) -> None:
+    if not 0 <= d <= 9:
+        return
+    m = BC_SEG[d]
+    h, mid = BC_T // 2, y + (BC_H - BC_T) // 2
+
+    def box(x0: int, y0: int, x1: int, y1: int) -> None:
+        draw.rectangle([x0, y0, x1, y1], fill=col)
+
+    if m & 0x01: box(x + h, y, x + BC_W - 1 - h, y + BC_T - 1)
+    if m & 0x40: box(x + h, mid, x + BC_W - 1 - h, mid + BC_T - 1)
+    if m & 0x08: box(x + h, y + BC_H - BC_T, x + BC_W - 1 - h, y + BC_H - 1)
+    if m & 0x20: box(x, y + h, x + BC_T - 1, y + BC_H // 2 - 1)
+    if m & 0x02: box(x + BC_W - BC_T, y + h, x + BC_W - 1, y + BC_H // 2 - 1)
+    if m & 0x10: box(x, y + BC_H // 2, x + BC_T - 1, y + BC_H - 1 - h)
+    if m & 0x04: box(x + BC_W - BC_T, y + BC_H // 2, x + BC_W - 1, y + BC_H - 1 - h)
+
+
+def _night(draw: ImageDraw.ImageDraw, s: Screen) -> None:
+    """กลางคืน: ทั้งจอเป็นของนาฬิกา ไม่มีมาสคอต ฟ้า หญ้า การ์ด หรือโควตา
+
+    ตัวเลขเจ็ดขีดวาดจากสี่เหลี่ยม เข้ากับภาษาภาพของทั้งเครื่องซึ่งประกอบจากสี่เหลี่ยมอยู่แล้ว
+    และสีเป็นสีลำตัวมาสคอตไม่ใช่สีขาว — สีอุ่นมีองค์ประกอบสีน้ำเงินน้อยกว่ามาก ซึ่งเป็น
+    ช่วงคลื่นที่รบกวนการนอนมากที่สุด จอที่อยู่ในห้องนอนจึงควรเป็นสีนี้แม้ความสว่างเท่ากัน
+    """
+    if not s.clock:
+        return
+    d = [int(s.clock[0]), int(s.clock[1]), int(s.clock[3]), int(s.clock[4])]
+    col = quantize565(PAL.clay)
+    total = 4 * BC_W + 4 * BC_GAP + BC_COLON
+    x = (L.screen.width - total) // 2
+    y = L.topbar.height + (L.screen.height - L.topbar.height - BC_H) // 2 - 12
+
+    _big_digit(draw, x, y, d[0], col)
+    x += BC_W + BC_GAP
+    _big_digit(draw, x, y, d[1], col)
+    x += BC_W + BC_GAP
+    # จุดคู่ — สี่เหลี่ยมจัตุรัสสองอันที่หนึ่งในสามและสองในสามของความสูง
+    for cy in (y + BC_H // 3 - BC_T // 2, y + 2 * BC_H // 3 - BC_T // 2):
+        draw.rectangle([x, cy, x + BC_COLON - 1, cy + BC_T - 1], fill=col)
+    x += BC_COLON + BC_GAP
+    _big_digit(draw, x, y, d[2], col)
+    x += BC_W + BC_GAP
+    _big_digit(draw, x, y, d[3], col)
+
+    if s.date:
+        draw.text((L.screen.width // 2, y + BC_H + 22), s.date, font=font(12),
+                  fill=quantize565(PAL.text_dim), anchor="mm")
+
+
 def render(s: Screen, phase: float = 0.0, cycle: int = 0) -> Image.Image:
     img = Image.new("RGB", (L.screen.width, L.screen.height), quantize565(PAL.bg))
     draw = ImageDraw.Draw(img)
     # ฉากอยู่หลังทุกอย่าง กินเต็มจอใต้แถบบน — มาสคอตยืนทับ ยอมให้บังดวงอาทิตย์/ดาว
     # การถูกบังคือระยะลึก ไม่ใช่ของหาย และตอนไม่มี session (ซึ่งเป็นเกือบตลอดเวลา)
     # ฟ้าโล่งทั้งแถบอยู่แล้ว
+    # กลางคืนกินทั้งจอใต้แถบบน — ออกก่อนทุกอย่าง เพราะ "ไม่วาด" คือทั้งหมดของโหมดนี้
+    # (firmware ทำแบบเดียวกัน: sky_draw_cb คืนทันที และ session/การ์ด/โควตาถูกนับเป็นศูนย์)
+    if s.night:
+        _topbar(draw, s)
+        _night(draw, s)
+        return img
     sky.draw(draw, s.clock, s.connected, cycle + phase, weather=s.weather)
     _topbar(draw, s)
     n = min(len(s.sessions), L.slots.count)

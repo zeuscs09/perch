@@ -89,6 +89,19 @@ SCENES: dict[str, screen.Screen] = {
         sessions=[screen.Session("perch", "sleeping", 0.0)],
         clock="02:14",
     ),
+    # โหมดกลางคืน — มี session ทำงานอยู่สองตัวและมีทั้งการ์ดและโควตาค้างอยู่ในมือ
+    # แต่ต้องไม่ขึ้นจอสักอย่าง นั่นคือทั้งหมดของโหมดนี้ ฉากจึงต้องมีของพวกนั้นไว้พิสูจน์
+    "night": screen.Screen(
+        sessions=[
+            screen.Session("perch", "writing", 0.0, "claude"),
+            screen.Session("infra", "building", 0.3, "codex"),
+        ],
+        cards=[screen.Card("perch", "needs permission to run git push", "alert")],
+        usage=[screen.Usage("Current", SESSION_WINDOW, 46, 42 * 60)],
+        clock="23:41",
+        date="Mon 27 Jul",
+        night=True,
+    ),
     # โควตาปกติ — สภาพที่จอจะเป็นเกือบตลอดเวลาที่ไม่มีอะไรต้องเตือน
     "usage": screen.Screen(
         sessions=[

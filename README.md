@@ -87,10 +87,17 @@ claude.ai.
 
 **At night, and when you touch it**
 
+<img src="docs/images/screen_night.png" width="420" alt="The screen at night: a large seven-segment clock in the mascot's own orange, the date below it, and nothing else">
+
 From 21:00 to 07:00 the screen becomes a clock and nothing else: no mascot, no sky, no grass,
-no alerts, and the onboard LED goes dark. This is for a bedroom — a status display that lights
-up the room at 3am is a status display you unplug. Touch the screen and it comes back to
-normal for 15 seconds, then settles again.
+no alerts, and the onboard LED goes dark. Sessions keep running and alerts keep arriving —
+they simply wait until morning. This is for a bedroom: a status display that lights up the
+room at 3am is a status display you unplug. Touch the screen and it comes back to normal for
+15 seconds, then settles again.
+
+The digits are the mascot's own orange rather than white, and not only because it is the
+project's colour — a warm colour carries far less blue, which is the part of the spectrum
+that disrupts sleep most. Same brightness, different light.
 
 Outside those hours the backlight fades down after a minute of no touching and wakes
 instantly when you tap. Tapping also pages to the quota panel.
