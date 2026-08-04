@@ -37,13 +37,68 @@
 // ตรงนั้นเป็นกลางลำตัว ไม่ใช่มุม จึงไม่ต้องเผื่อสองเท่าแบบขา
 #define ARM_OVERLAP CORNER
 
-// ขาทั้งสี่กว้างเท่ากันช่องละหนึ่ง อยู่ที่ช่อง 0/2/5/7 ของลำตัว — ช่องกลางจึงกว้างสองช่อง
-// ส่วนช่องข้างกว้างช่องเดียว และขาคู่นอกชิดขอบลำตัวพอดี (ทั้งหมดตามภาพอ้างอิง)
-static const float LEG_SPANS[4][2] = {
-    {BODY_X + 0 * CELL, CELL},
-    {BODY_X + 2 * CELL, CELL},
-    {BODY_X + 5 * CELL, CELL},
-    {BODY_X + 7 * CELL, CELL}};
+// --- รูปทรงต่อเอเจนต์ --------------------------------------------------------
+// ต้องตรงกับ SHAPES ใน tools/gen/mascot.py ทุกตัวเลข
+//
+// ทุกค่าในนี้อยู่ *ข้างใน* ซิลลูเอ็ตเท่านั้น กรอบนอกของทุกเอเจนต์ต้องเท่ากันเป๊ะ:
+// กว้าง 16.5 unit ยอดหัวที่ y = 0 ฝ่าเท้าที่ y = 12 — เพราะ s_center_dx มีชุดเดียว
+// และ prop ทุกชิ้นวัดจากกรอบนั้น ถ้าเอเจนต์ไหนล้นออกด้านข้าง ค้อนกับหมวกจะเกาะผิดที่ทั้งชุด
+// (ฝั่ง Python มี agents_share_one_box() คอยยืนยันข้อตกลงนี้)
+#define MAX_LEGS 4
+
+typedef struct {
+    float body_h;
+    int leg_count;
+    float legs[MAX_LEGS][2];  // (x, w) ต่อขาหนึ่งข้าง
+    float arm_y;
+    float arm_h;
+    bool has_screen;
+    float screen[4];  // x, y, w, h ของจอจมสีเข้มที่ตาไปอยู่บนนั้น
+} shape_t;
+
+static const shape_t SHAPES[PCH_AGENT_COUNT] = {
+    // Claude — ขาทั้งสี่กว้างช่องละหนึ่ง อยู่ที่ช่อง 0/2/5/7 ของลำตัว ช่องกลางจึงกว้างสองช่อง
+    // ส่วนช่องข้างกว้างช่องเดียว และขาคู่นอกชิดขอบลำตัวพอดี (ทั้งหมดตามภาพอ้างอิง)
+    [PCH_AGENT_CLAUDE] = {.body_h = LEG_TOP,
+                          .leg_count = 4,
+                          .legs = {{BODY_X + 0 * CELL, CELL},
+                                   {BODY_X + 2 * CELL, CELL},
+                                   {BODY_X + 5 * CELL, CELL},
+                                   {BODY_X + 7 * CELL, CELL}},
+                          .arm_y = NUB_Y,
+                          .arm_h = NUB_H,
+                          .has_screen = false},
+    // Codex — จอบนสองขา ไม่ใช่ตัวสี่ขาทาสีใหม่
+    //
+    // ตัวแยกที่อ่านออกจากอีกฝั่งห้องคือ *ซิลลูเอ็ต* ไม่ใช่สี: จำนวนขาต่างกัน (2 ไม่ใช่ 4)
+    // และมีจอจมสีเข้มแทนหน้าเรียบ — สองอย่างนี้เห็นได้ก่อนที่สายตาจะแยกสีฟ้าออกจากสีดิน
+    //
+    // ขายาวกว่าของ Claude (3.6 เทียบกับ 3.0) เพราะลำตัวเตี้ยลงมาให้จอได้สัดส่วน
+    // ฝ่าเท้ายังอยู่ที่ 12 เท่าเดิม — ที่เปลี่ยนคือเส้นแบ่งระหว่างตัวกับขา ไม่ใช่ความสูงรวม
+    [PCH_AGENT_CODEX] = {.body_h = 8.4f,
+                         .leg_count = 2,
+                         .legs = {{3.6f, 3.4f}, {9.0f, 3.4f}},
+                         .arm_y = 2.6f,
+                         .arm_h = 2.8f,
+                         .has_screen = true,
+                         .screen = {3.1f, 0.7f, 9.8f, 6.0f}},
+    // Antigravity ยังใช้รูปทรงของ Claude — เปลี่ยนแค่สี จนกว่าจะมีคนวาดตัวให้มัน
+    [PCH_AGENT_ANTIGRAVITY] = {.body_h = LEG_TOP,
+                               .leg_count = 4,
+                               .legs = {{BODY_X + 0 * CELL, CELL},
+                                        {BODY_X + 2 * CELL, CELL},
+                                        {BODY_X + 5 * CELL, CELL},
+                                        {BODY_X + 7 * CELL, CELL}},
+                               .arm_y = NUB_Y,
+                               .arm_h = NUB_H,
+                               .has_screen = false},
+};
+
+static const shape_t *shape_of(pch_agent_t agent)
+{
+    if (agent < 0 || agent >= PCH_AGENT_COUNT) agent = PCH_AGENT_CLAUDE;
+    return &SHAPES[agent];
+}
 
 // ช่วง phase ที่ตากะพริบ — สั้นมากโดยตั้งใจ กะพริบนานกว่านี้จะดูเหมือนง่วง
 #define BLINK_FROM 0.88f
@@ -186,21 +241,24 @@ static void eye(pch_rects_t *o, float x, eye_t kind, float look, uint16_t ink, f
 }
 
 // --- ขา ---------------------------------------------------------------------
-static void legs(pch_rects_t *o, gait_t gait, float phase, uint16_t color, float extra_lift)
+static void legs(pch_rects_t *o, const shape_t *sh, gait_t gait, float phase, uint16_t color,
+                 float extra_lift)
 {
-    for (int i = 0; i < 4; i++) {
+    float leg_h = FOOT_Y - sh->body_h;
+    for (int i = 0; i < sh->leg_count; i++) {
         float lift = extra_lift;
         if (gait == GAIT_WALK) {
-            // ขาคู่ทแยง (0,2) กับ (1,3) สลับกันยก
+            // สลับข้างกันยกตามดัชนีคู่/คี่ — สี่ขาได้คู่ทแยง (0,2) กับ (1,3)
+            // สองขาได้ซ้ายสลับขวา ซึ่งเป็นการเดินที่ถูกของทั้งสองแบบโดยไม่ต้องแยกโค้ด
             bool up = (phase < 0.5f) == (i % 2 == 0);
-            lift += up ? LEG_H * 0.34f : 0.0f;
+            lift += up ? leg_h * 0.34f : 0.0f;
         } else if (gait == GAIT_SIT) {
-            lift += LEG_H * 0.66f;
+            lift += leg_h * 0.66f;
         }
-        float h = LEG_H - lift;
+        float h = leg_h - lift;
         if (h < 0.6f) h = 0.6f;
-        // ยืดขึ้นไปซ้อนใต้ลำตัว — ความสูงที่ *เห็น* ยังเป็น LEG_H - lift เท่าเดิม
-        pch_rects_add_round(o, LEG_SPANS[i][0], LEG_TOP - LEG_OVERLAP, LEG_SPANS[i][1],
+        // ยืดขึ้นไปซ้อนใต้ลำตัว — ความสูงที่ *เห็น* ยังเป็น leg_h - lift เท่าเดิม
+        pch_rects_add_round(o, sh->legs[i][0], sh->body_h - LEG_OVERLAP, sh->legs[i][1],
                            h + LEG_OVERLAP, color, CORNER);
     }
 }
@@ -220,23 +278,29 @@ static void arm(pch_rects_t *o, float x0, float y, float h, float side, uint16_t
     pch_rects_add_round(o, x, y, NUB_W + ARM_OVERLAP, h, color, CORNER);
 }
 
-static void body(pch_rects_t *o, uint16_t color, float arm_l, float arm_r, float arm_out)
+static void body(pch_rects_t *o, const shape_t *sh, uint16_t color, uint16_t screen_c,
+                 float arm_l, float arm_r, float arm_out)
 {
-    pch_rects_add_round(o, BODY_X, BODY_Y, BODY_W, BODY_H, color, CORNER);
+    pch_rects_add_round(o, BODY_X, BODY_Y, BODY_W, sh->body_h, color, CORNER);
+    // จอจมวาดทับลำตัวทันที ก่อนแขน — ตาจะมาทับอีกทีตอนท้าย pch_mascot_build()
+    if (sh->has_screen) {
+        pch_rects_add_round(o, sh->screen[0], sh->screen[1], sh->screen[2], sh->screen[3],
+                           screen_c, CORNER * 0.6f);
+    }
     if (arm_out == 0.0f) {
-        arm(o, BODY_X - NUB_W, NUB_Y + arm_l, NUB_H, -1.0f, color);
-        arm(o, BODY_X + BODY_W, NUB_Y + arm_r, NUB_H, 1.0f, color);
+        arm(o, BODY_X - NUB_W, sh->arm_y + arm_l, sh->arm_h, -1.0f, color);
+        arm(o, BODY_X + BODY_W, sh->arm_y + arm_r, sh->arm_h, 1.0f, color);
         return;
     }
     // แต่ละท่อนเตี้ยกว่าแขนปกติ สองท่อนรวมกันจึงไม่ยาวเกินสัดส่วนเดิม
-    float h = NUB_H * 0.8f;
+    float h = sh->arm_h * 0.8f;
     const float SIDE[2] = {-1.0f, 1.0f};
     const float X0[2] = {BODY_X - NUB_W, BODY_X + BODY_W};
     const float DY[2] = {arm_l, arm_r};
     for (int i = 0; i < 2; i++) {
         // ท่อนใน — ติดลำตัว ยกขึ้นครึ่งทางของท่อนนอก จึงอ่านเป็นแขนที่เอียงขึ้น
-        arm(o, X0[i], NUB_Y + DY[i] + h * 0.5f, h, SIDE[i], color);
-        arm(o, X0[i] + SIDE[i] * arm_out, NUB_Y + DY[i], h, SIDE[i], color);
+        arm(o, X0[i], sh->arm_y + DY[i] + h * 0.5f, h, SIDE[i], color);
+        arm(o, X0[i] + SIDE[i] * arm_out, sh->arm_y + DY[i], h, SIDE[i], color);
     }
 }
 
@@ -249,31 +313,61 @@ static void squashed(pch_rects_t *rs, int from, float squash)
     pch_rects_scale_from(rs, from, 1.0f + squash * 0.45f, 1.0f - squash, PCH_HEAD_CX, FOOT_Y);
 }
 
-// คืน (สีตัว, สีตา)
-static void skin(bool connected, pch_state_t state, uint16_t *body_c, uint16_t *ink)
+// (ลำตัว, ลำตัวตอนหลับ, จอจม, ตา) — ต้องตรงกับ AGENT_SKIN ใน tools/gen/mascot.py
+//
+// สีตาอยู่ในตารางนี้เพราะมันขึ้นกับว่าตาไปวางอยู่บนอะไร ไม่ใช่รสนิยม: ตาของ Claude อยู่บน
+// เนื้อตัวสีสว่างจึงต้องเป็นหมึก ส่วนตาของ Codex อยู่บนจอสีเข้มจึงต้องเรืองแสง
+typedef struct {
+    uint16_t base;
+    uint16_t dark;
+    uint16_t sleep;
+    uint16_t eye;
+} palette_t;
+
+static const palette_t PALETTES[PCH_AGENT_COUNT] = {
+    [PCH_AGENT_CLAUDE] = {PCH_COL_CLAY, PCH_COL_CLAY_DARK, PCH_COL_CLAY_SLEEP, PCH_COL_INK},
+    [PCH_AGENT_CODEX] = {PCH_COL_CODEX, PCH_COL_CODEX_DARK, PCH_COL_CODEX_SLEEP,
+                         PCH_COL_CODEX_EYE},
+    [PCH_AGENT_ANTIGRAVITY] = {PCH_COL_ANTIGRAV, PCH_COL_ANTIGRAV_DARK, PCH_COL_ANTIGRAV_SLEEP,
+                               PCH_COL_INK},
+};
+
+// คืน (สีตัว, สีตา, สีจอจม)
+//
+// สีจอถูกคืนมาเสมอแม้เอเจนต์นั้นจะไม่มีจอ — body() จะไม่ใช้มันเองถ้า has_screen เป็น false
+static void skin(bool connected, pch_state_t state, pch_agent_t agent, uint16_t *body_c,
+                 uint16_t *ink, uint16_t *screen_c)
 {
+    if (agent < 0 || agent >= PCH_AGENT_COUNT) agent = PCH_AGENT_CLAUDE;
+    const palette_t *p = &PALETTES[agent];
     if (!connected) {
+        // จอดับสนิท ไม่ใช่แค่เทาลง — ถ้าจอเป็น GRAY_DARK เท่ากับสีตา ตาจะหายไปทั้งดวง
         *body_c = PCH_COL_GRAY;
         *ink = PCH_COL_GRAY_DARK;
+        *screen_c = PCH_COL_INK;
         return;
     }
     if (state == PCH_STATE_SLEEPING) {
         // หรี่ลงเล็กน้อยเท่านั้น — ถ้าเปลี่ยนสีแรงจะไปชนกับสัญญาณ "หลุดการเชื่อมต่อ"
-        *body_c = PCH_COL_CLAY_DARK;
-        *ink = PCH_COL_INK;
+        // ตัวที่มีจอได้ภาษาของตัวเองมาฟรี: ลำตัวหรี่ลงจนเกือบเท่าจอ = จอที่กำลังจะดับ
+        *body_c = p->dark;
+        *ink = p->eye;
+        *screen_c = p->sleep;
         return;
     }
-    *body_c = PCH_COL_CLAY;
-    *ink = PCH_COL_INK;
+    *body_c = p->base;
+    *ink = p->eye;
+    *screen_c = p->sleep;
 }
 
 void pch_mascot_build(pch_rects_t *out, pch_state_t state, float phase, bool connected,
-                     int cycle)
+                     int cycle, pch_agent_t agent)
 {
     if (state < 0 || state >= PCH_STATE_COUNT) state = PCH_STATE_IDLE;
     const mood_t *m = &MOODS[STATES[state].mood];
-    uint16_t body_c, ink;
-    skin(connected, state, &body_c, &ink);
+    const shape_t *sh = shape_of(agent);
+    uint16_t body_c, ink, screen_c;
+    skin(connected, state, agent, &body_c, &ink, &screen_c);
 
     // ปัด dy ลงตารางพิกเซลก่อน ไม่งั้นแต่ละ rect ปัดคนละทางแล้วเห็นแค่เส้นขอบกระพริบ
     // แทนที่จะเห็นทั้งตัวเลื่อนขึ้นลงพร้อมกัน
@@ -302,8 +396,8 @@ void pch_mascot_build(pch_rects_t *out, pch_state_t state, float phase, bool con
     float arm = m->arm * sinf(phase * (float)M_PI * 4.0f);
     // ยกค้างนิ่ง — ถ้าขยับขึ้นลงจะอ่านเป็นโบกมือ ไม่ใช่ยกค้างเพ่งพลัง
     float arm_lift = m->arm_up;
-    body(&silhouette, body_c, arm - arm_lift, -arm - arm_lift, m->arm_out);
-    legs(&silhouette, m->gait, phase, body_c, m->sink * phase * LEG_H * 0.9f);
+    body(&silhouette, sh, body_c, screen_c, arm - arm_lift, -arm - arm_lift, m->arm_out);
+    legs(&silhouette, sh, m->gait, phase, body_c, m->sink * phase * (FOOT_Y - sh->body_h) * 0.9f);
     squashed(&silhouette, 0, squash);
     pch_rects_move_from(&silhouette, 0, dx, dy);
 
@@ -383,7 +477,9 @@ void pch_mascot_init(void)
     for (int s = 0; s < PCH_STATE_COUNT; s++) {
         float x0 = 1e9f, x1 = -1e9f;
         for (int i = 0; i < 12; i++) {
-            pch_mascot_build(&frame, (pch_state_t)s, i / 12.0f, true, 0);
+            // วัดจาก Claude ตัวเดียวพอ — ทุกเอเจนต์ต้องกินพื้นที่แนวนอนเท่ากันตามข้อตกลง
+            // ที่ shape_t อธิบายไว้ ตารางนี้จึงมีชุดเดียวและใช้ได้กับทุกตัว
+            pch_mascot_build(&frame, (pch_state_t)s, i / 12.0f, true, 0, PCH_AGENT_CLAUDE);
             float fx0, fy0, fx1, fy1;
             pch_rects_bounds(&frame, &fx0, &fy0, &fx1, &fy1);
             if (fx0 < x0) x0 = fx0;
@@ -394,10 +490,10 @@ void pch_mascot_init(void)
 }
 
 void pch_mascot_build_centered(pch_rects_t *out, pch_state_t state, float phase, bool connected,
-                              int cycle)
+                              int cycle, pch_agent_t agent)
 {
     if (state < 0 || state >= PCH_STATE_COUNT) state = PCH_STATE_IDLE;
-    pch_mascot_build(out, state, phase, connected, cycle);
+    pch_mascot_build(out, state, phase, connected, cycle, agent);
     pch_rects_move_from(out, 0, s_center_dx[state], 0.0f);
 }
 

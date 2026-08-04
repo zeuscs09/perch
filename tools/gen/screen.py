@@ -48,9 +48,14 @@ class Session:
     project: str
     state: str = "idle"
     phase_offset: float = 0.0
+    agent: str = "claude"
 
     def __post_init__(self) -> None:
         _ascii_only(project=self.project)
+        # ชื่อเอเจนต์ที่พิมพ์ผิดจะตกไปเป็น Claude เงียบๆ ใน mascot.build() ซึ่งอ่านออกมา
+        # เป็นภาพที่ "ถูก" ทุกประการ ไม่มีอะไรบอกว่าฉากที่ตั้งใจจะทดสอบไม่เคยถูกเรนเดอร์เลย
+        if self.agent not in mascot.SHAPES:
+            raise ValueError(f"unknown agent: {self.agent!r}")
 
 
 @dataclass(slots=True)
@@ -267,7 +272,9 @@ def _slot(draw: ImageDraw.ImageDraw, i: int, sess: Session | None, s: Screen,
     body_cx = x + sw / 2 + (BODY_CX - (bx0 + bx1) / 2) * px
     _shadow(draw, body_cx, sky.shadow_color(s.clock, s.connected))
 
-    rects = mascot.build_centered(sess.state, p % 1.0, s.connected, cycle + int(p))
+    rects = mascot.build_centered(
+        sess.state, p % 1.0, s.connected, cycle + int(p), sess.agent
+    )
     draw_rects(draw, rects, px, ox, oy)
 
     f = font(9)

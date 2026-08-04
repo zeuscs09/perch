@@ -4,65 +4,65 @@
 
 #include <stdint.h>
 
-#define PCH_SCREEN_WIDTH              320
-#define PCH_SCREEN_HEIGHT             240
+#define PCH_SCREEN_WIDTH             320
+#define PCH_SCREEN_HEIGHT            240
 
-#define PCH_TOPBAR_HEIGHT             22
-#define PCH_TOPBAR_LINK_ICON_W        11
-#define PCH_TOPBAR_LINK_ICON_H        9
-#define PCH_TOPBAR_LINK_ICON_GAP      6
+#define PCH_TOPBAR_HEIGHT            22
+#define PCH_TOPBAR_LINK_ICON_W       11
+#define PCH_TOPBAR_LINK_ICON_H       9
+#define PCH_TOPBAR_LINK_ICON_GAP     6
 
-#define PCH_SLOTS_COUNT               3
-#define PCH_SLOTS_WIDTH               106
-#define PCH_SLOTS_TOP                 49
-#define PCH_SLOTS_HEIGHT              90
-#define PCH_SLOTS_UNIT_PX             4
-#define PCH_SLOTS_BASELINE_PAD        19
+#define PCH_SLOTS_COUNT              3
+#define PCH_SLOTS_WIDTH              106
+#define PCH_SLOTS_TOP                49
+#define PCH_SLOTS_HEIGHT             90
+#define PCH_SLOTS_UNIT_PX            4
+#define PCH_SLOTS_BASELINE_PAD       19
 
-#define PCH_CARD_TOP                  142
-#define PCH_CARD_HEIGHT               98
-#define PCH_CARD_PAD                  6
-#define PCH_CARD_MAX                  2
+#define PCH_CARD_TOP                 142
+#define PCH_CARD_HEIGHT              98
+#define PCH_CARD_PAD                 6
+#define PCH_CARD_MAX                 2
 
-#define PCH_USAGE_ROW_H               40
-#define PCH_USAGE_GAP                 4
-#define PCH_USAGE_BAR_H               7
-#define PCH_USAGE_COLS                2
-#define PCH_USAGE_GUTTER              14
-#define PCH_USAGE_ROWS                4
-#define PCH_USAGE_SESSION_WINDOW      18000
-#define PCH_USAGE_WEEKLY_WINDOW       604800
-#define PCH_USAGE_WARN_PCT            60
-#define PCH_USAGE_CRIT_PCT            85
+#define PCH_USAGE_ROW_H              40
+#define PCH_USAGE_GAP                4
+#define PCH_USAGE_BAR_H              7
+#define PCH_USAGE_COLS               2
+#define PCH_USAGE_GUTTER             14
+#define PCH_USAGE_ROWS               4
+#define PCH_USAGE_SESSION_WINDOW     18000
+#define PCH_USAGE_WEEKLY_WINDOW      604800
+#define PCH_USAGE_WARN_PCT           60
+#define PCH_USAGE_CRIT_PCT           85
 
-#define PCH_WEATHER_DROPS             26
-#define PCH_WEATHER_DROP_LEN          7
-#define PCH_WEATHER_DROP_SLANT        2
-#define PCH_WEATHER_DROP_SPEED_PX_S   150
-#define PCH_WEATHER_OVERCAST_CLOUDS   7
-#define PCH_WEATHER_FLASH_EVERY_S     9.0f
-#define PCH_WEATHER_FLASH_HOLD_S      0.12f
+#define PCH_WEATHER_DROPS            26
+#define PCH_WEATHER_DROP_LEN         7
+#define PCH_WEATHER_DROP_SLANT       2
+#define PCH_WEATHER_DROP_SPEED_PX_S  150
+#define PCH_WEATHER_OVERCAST_CLOUDS  7
+#define PCH_WEATHER_FLASH_EVERY_S    9.0f
+#define PCH_WEATHER_FLASH_HOLD_S     0.12f
 
-#define PCH_STROLL_SPEED_PX_S         34
-#define PCH_STROLL_PAUSE_S            2.5f
-#define PCH_STROLL_PAD_PX             96
+#define PCH_STROLL_SPEED_PX_S        34
+#define PCH_STROLL_PAUSE_S           2.5f
+#define PCH_STROLL_PAD_PX            96
 
-#define PCH_SKY_HORIZON               120
-#define PCH_SKY_DAWN_HOUR             5
-#define PCH_SKY_DAY_HOUR              7
-#define PCH_SKY_DUSK_HOUR             17
-#define PCH_SKY_NIGHT_HOUR            19
-#define PCH_SKY_DISC_R                7
-#define PCH_SKY_ARC_PEAK              82
-#define PCH_SKY_ARC_PAD               0
-#define PCH_SKY_TWINKLE_N             4
-#define PCH_SKY_STAR_PX               1
-#define PCH_SKY_STAR_PEAK_PX          3
-#define PCH_SKY_LOW_STAR_N            6
-#define PCH_SKY_CLOUD_SPEED_PX_S      4
-#define PCH_SKY_CLOUD_PAD             60
+#define PCH_SKY_HORIZON              120
+#define PCH_SKY_DAWN_HOUR            5
+#define PCH_SKY_DAY_HOUR             7
+#define PCH_SKY_DUSK_HOUR            17
+#define PCH_SKY_NIGHT_HOUR           19
+#define PCH_SKY_DISC_R               7
+#define PCH_SKY_ARC_PEAK             82
+#define PCH_SKY_ARC_PAD              0
+#define PCH_SKY_TWINKLE_N            4
+#define PCH_SKY_STAR_PX              1
+#define PCH_SKY_STAR_PEAK_PX         3
+#define PCH_SKY_LOW_STAR_N           6
+#define PCH_SKY_CLOUD_SPEED_PX_S     4
+#define PCH_SKY_CLOUD_PAD            60
 
-#define PCH_SKY_STARS_COUNT           16
+#define PCH_SKY_STARS_COUNT          16
 static const int16_t pch_sky_stars[PCH_SKY_STARS_COUNT][2] = {
     { 33,  63},
     {128,  67},
@@ -82,22 +82,22 @@ static const int16_t pch_sky_stars[PCH_SKY_STARS_COUNT][2] = {
     {307,  80},
 };
 
-#define PCH_SKY_CLOUDS_COUNT          3
+#define PCH_SKY_CLOUDS_COUNT         3
 static const int16_t pch_sky_clouds[PCH_SKY_CLOUDS_COUNT][3] = {
     { 40,  44,  44},
     {150,  74,  36},
     {250,  32,  52},
 };
 
-#define PCH_SKY_GRASS_X_COUNT         24
+#define PCH_SKY_GRASS_X_COUNT        24
 static const int16_t pch_sky_grass_x[PCH_SKY_GRASS_X_COUNT] = {
       4,  13,  35,  41,  55,  62,  88,  99, 104, 123, 131, 155,
     168, 174, 191, 200, 228, 235, 247, 268, 273, 288, 298, 310,
 };
 
-#define PCH_MASCOT_GRID_W             16.5f
-#define PCH_MASCOT_GRID_H             12
-#define PCH_MASCOT_CORNER             0.25f
+#define PCH_MASCOT_GRID_W            16.5f
+#define PCH_MASCOT_GRID_H            12
+#define PCH_MASCOT_CORNER            0.25f
 
 // กรอบวาดมาสคอตรวม prop (หน่วย unit) — มาจาก tools/gen/props.py
 #define PCH_BOX_X0                    -0.5f
@@ -131,6 +131,7 @@ static const int16_t pch_sky_grass_x[PCH_SKY_GRASS_X_COUNT] = {
 #define PCH_COL_CODEX                 0x4D58
 #define PCH_COL_CODEX_DARK            0x33B1
 #define PCH_COL_CODEX_SLEEP           0x2A6B
+#define PCH_COL_CODEX_EYE             0xAF5E
 #define PCH_COL_ANTIGRAV              0x8BFB
 #define PCH_COL_ANTIGRAV_DARK         0x62B5
 #define PCH_COL_ANTIGRAV_SLEEP        0x41CD

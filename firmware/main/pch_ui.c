@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "pch_agent.h"
 #include "pch_mascot.h"
 #include "pch_rects.h"
 #include "layout.h"
@@ -524,9 +523,10 @@ static void slot_draw_cb(lv_event_t *e)
     draw_shadow(layer, ox + (BODY_CX + pch_mascot_center_dx(state)) * px);
 
     pch_rects_t rects;
-    pch_mascot_build_centered(&rects, state, phase, s_connected, s_cycle + slot->index);
-    // ทาสีตามเอเจนต์หลัง build — ท่าและ prop เหมือนกันทุกเอเจนต์ ต่างแค่สีลำตัว
-    pch_agent_recolor(&rects, s_snap.sessions[slot->index].agent);
+    // เอเจนต์ส่งเข้าไปตั้งแต่ build ไม่ใช่ทาสีทับทีหลัง — แต่ละตัวคนละรูปทรง จำนวนขาไม่เท่ากัน
+    // และบางตัวมีจอ การแก้สีของ rect ที่วาดเสร็จแล้วเปลี่ยนรูปทรงไม่ได้
+    pch_mascot_build_centered(&rects, state, phase, s_connected, s_cycle + slot->index,
+                             s_snap.sessions[slot->index].agent);
     draw_mascot_rects(layer, &rects, ox, oy);
 }
 
@@ -584,7 +584,9 @@ static void stroll_draw_cb(lv_event_t *e)
     draw_shadow(layer, ox + BODY_CX * px);
 
     pch_rects_t rects;
-    pch_mascot_build(&rects, state, s_phase, s_connected, s_cycle);
+    // ตัวเดินเล่นตอนไม่มี session เป็น Claude เสมอ — ไม่มีเอเจนต์ไหนอ้างสิทธิ์ในฉากนี้
+    // และมาสคอตส้มคือหน้าตาของโครงการเอง ไม่ใช่ตัวแทนของ session ใด session หนึ่ง
+    pch_mascot_build(&rects, state, s_phase, s_connected, s_cycle, PCH_AGENT_CLAUDE);
     draw_mascot_rects(layer, &rects, ox, foot - PCH_BOX_Y1 * px);
 }
 

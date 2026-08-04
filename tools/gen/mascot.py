@@ -64,6 +64,62 @@ LEG_OVERLAP = CORNER * 2.0
 ARM_OVERLAP = CORNER
 
 
+# --- รูปทรงต่อเอเจนต์ -------------------------------------------------------
+@dataclass(frozen=True, slots=True)
+class Shape:
+    """สิ่งที่ทำให้เอเจนต์แต่ละตัวเป็นคนละสายพันธุ์ — ไม่ใช่แค่คนละสี
+
+    ทุกค่าในนี้อยู่ *ข้างใน* ซิลลูเอ็ตเท่านั้น กรอบนอกของทุกเอเจนต์ต้องเท่ากันเป๊ะ:
+    กว้าง 16.5 unit ยอดหัวที่ y = 0 ฝ่าเท้าที่ y = 12 — เพราะ state_box() กับ prop
+    ทุกชิ้นวัดจากกรอบนั้น ถ้าเอเจนต์ไหนล้นออกไป ค้อนกับหมวกจะไปเกาะผิดที่ทั้งชุด
+    """
+
+    body_h: float
+    legs: tuple[tuple[float, float], ...]  # (x, w) ต่อขาหนึ่งข้าง
+    arm_y: float
+    arm_h: float
+    # จอจมสีเข้มที่ตาไปอยู่บนนั้น (x, y, w, h) — None = ลำตัวเรียบแบบ Claude
+    screen: tuple[float, float, float, float] | None = None
+
+    @property
+    def leg_h(self) -> float:
+        return FOOT_Y - self.body_h
+
+
+CLAUDE_SHAPE = Shape(body_h=LEG_TOP, legs=LEG_SPANS, arm_y=NUB_Y, arm_h=NUB_H)
+
+# Codex — จอบนสองขา ไม่ใช่ตัวสี่ขาทาสีใหม่
+#
+# ตัวแยกที่อ่านออกจากอีกฝั่งห้องคือ *ซิลลูเอ็ต* ไม่ใช่สี: จำนวนขาต่างกัน (2 ไม่ใช่ 4)
+# และมีจอจมสีเข้มแทนหน้าเรียบ — สองอย่างนี้เห็นได้ก่อนที่สายตาจะแยกสีฟ้าออกจากสีดิน
+#
+# ขายาวกว่าของ Claude (3.6 เทียบกับ 3.0) เพราะลำตัวเตี้ยลงมาเพื่อให้จอได้สัดส่วน
+# ฝ่าเท้ายังอยู่ที่ 12 เท่าเดิม — ที่เปลี่ยนคือเส้นแบ่งระหว่างตัวกับขา ไม่ใช่ความสูงรวม
+CODEX_SHAPE = Shape(
+    body_h=8.4,
+    legs=((3.6, 3.4), (9.0, 3.4)),
+    arm_y=2.6,
+    arm_h=2.8,
+    screen=(3.1, 0.7, 9.8, 6.0),
+)
+
+SHAPES: dict[str, Shape] = {
+    "claude": CLAUDE_SHAPE,
+    "codex": CODEX_SHAPE,
+    "antigravity": CLAUDE_SHAPE,
+}
+
+# (ลำตัว, ลำตัวตอนหลับ, จอจม, ตา) — สามค่าแรกตรงกับ clay / clay_dark / clay_sleep ของ Claude
+#
+# สีตาอยู่ในตารางนี้เพราะมันขึ้นกับว่าตาไปวางอยู่บนอะไร ไม่ใช่รสนิยม: ตาของ Claude อยู่บน
+# เนื้อตัวสีสว่างจึงต้องเป็นหมึก ส่วนตาของ Codex อยู่บนจอสีเข้มจึงต้องเรืองแสง
+AGENT_SKIN: dict[str, tuple[str, str, str, str]] = {
+    "claude": (PAL.clay, PAL.clay_dark, PAL.clay_sleep, PAL.ink),
+    "codex": (PAL.codex, PAL.codex_dark, PAL.codex_sleep, PAL.codex_eye),
+    "antigravity": (PAL.antigrav, PAL.antigrav_dark, PAL.antigrav_sleep, PAL.ink),
+}
+
+
 # --- ตา --------------------------------------------------------------------
 def _eye(x: float, kind: str, look: float, ink: str, scale: float = 1.0) -> RectList:
     """ตาหนึ่งข้าง กล่องฐาน EYE_S x EYE_S ที่ (x, EYE_Y) — ทุกค่าอิงสัดส่วน ไม่ฝังตัวเลขดิบ
@@ -98,19 +154,25 @@ def _eye(x: float, kind: str, look: float, ink: str, scale: float = 1.0) -> Rect
 
 
 # --- ขา --------------------------------------------------------------------
-def _legs(gait: str, phase: float, color: str, extra_lift: float = 0.0) -> RectList:
+def _legs(
+    gait: str, phase: float, color: str, extra_lift: float = 0.0, shape: Shape = CLAUDE_SHAPE
+) -> RectList:
     out: RectList = []
-    for i, (lx, lw) in enumerate(LEG_SPANS):
+    leg_h = shape.leg_h
+    for i, (lx, lw) in enumerate(shape.legs):
         lift = extra_lift
         if gait == "walk":
-            # ขาคู่ทแยง (0,2) กับ (1,3) สลับกันยก
+            # สลับข้างกันยกตามดัชนีคู่/คี่ — สี่ขาได้คู่ทแยง (0,2) กับ (1,3)
+            # สองขาได้ซ้ายสลับขวา ซึ่งเป็นการเดินที่ถูกต้องของทั้งสองแบบโดยไม่ต้องแยกโค้ด
             up = (phase < 0.5) == (i % 2 == 0)
-            lift += LEG_H * 0.34 if up else 0.0
+            lift += leg_h * 0.34 if up else 0.0
         elif gait == "sit":
-            lift += LEG_H * 0.66
-        # ยืดขึ้นไปซ้อนใต้ลำตัว — ความสูงที่ *เห็น* ยังเป็น LEG_H - lift เท่าเดิม
-        h = max(LEG_H - lift, 0.6)
-        out.append(Rect(lx, LEG_TOP - LEG_OVERLAP, lw, h + LEG_OVERLAP, color, CORNER))
+            lift += leg_h * 0.66
+        # ยืดขึ้นไปซ้อนใต้ลำตัว — ความสูงที่ *เห็น* ยังเป็น leg_h - lift เท่าเดิม
+        h = max(leg_h - lift, 0.6)
+        out.append(
+            Rect(lx, shape.body_h - LEG_OVERLAP, lw, h + LEG_OVERLAP, color, CORNER)
+        )
     return out
 
 
@@ -127,7 +189,11 @@ def _arm(x0: float, y: float, h: float, side: float, color: str) -> Rect:
 
 
 def _body(
-    color: str, arm_dy: tuple[float, float] = (0.0, 0.0), arm_out: float = 0.0
+    color: str,
+    arm_dy: tuple[float, float] = (0.0, 0.0),
+    arm_out: float = 0.0,
+    shape: Shape = CLAUDE_SHAPE,
+    screen_color: str | None = None,
 ) -> RectList:
     """ลำตัวกับแขนสองข้างในสัดส่วนปกติ — การยุบตัวทำทีหลังด้วย _squashed()
 
@@ -136,17 +202,23 @@ def _body(
     ก้อนเดียวที่เลื่อนขึ้นเฉยๆ อ่านเป็น "ไหล่สูงขึ้น" ไม่ใช่ "ยกมือ" — ต้องมีท่อนที่เยื้อง
     ออกไปนอกซิลลูเอ็ต สายตาถึงจะเห็นเป็นแขนที่กางขึ้น
     """
-    bx, by, bw, bh = BODY
+    bx, by, bw = BODY[0], BODY[1], BODY[2]
+    bh = shape.body_h
     out = [Rect(bx, by, bw, bh, color, CORNER)]
+    # จอจมวาดทับลำตัวทันที ก่อนแขน — ตาจะมาทับอีกทีตอนท้าย build()
+    if shape.screen is not None and screen_color is not None:
+        sx, sy, sw, sh = shape.screen
+        out.append(Rect(sx, sy, sw, sh, screen_color, CORNER * 0.6))
+    arm_y, arm_h = shape.arm_y, shape.arm_h
     if arm_out == 0.0:
-        out.append(_arm(bx - NUB_W, NUB_Y + arm_dy[0], NUB_H, -1.0, color))
-        out.append(_arm(bx + bw, NUB_Y + arm_dy[1], NUB_H, 1.0, color))
+        out.append(_arm(bx - NUB_W, arm_y + arm_dy[0], arm_h, -1.0, color))
+        out.append(_arm(bx + bw, arm_y + arm_dy[1], arm_h, 1.0, color))
         return out
-    h = NUB_H * 0.8  # แต่ละท่อนเตี้ยกว่าแขนปกติ สองท่อนรวมกันจึงไม่ยาวเกินสัดส่วนเดิม
+    h = arm_h * 0.8  # แต่ละท่อนเตี้ยกว่าแขนปกติ สองท่อนรวมกันจึงไม่ยาวเกินสัดส่วนเดิม
     for side, x0, dy in ((-1.0, bx - NUB_W, arm_dy[0]), (1.0, bx + bw, arm_dy[1])):
         # ท่อนใน — ติดลำตัว ยกขึ้นครึ่งทางของท่อนนอก จึงอ่านเป็นแขนที่เอียงขึ้น
-        out.append(_arm(x0, NUB_Y + dy + h * 0.5, h, side, color))
-        out.append(_arm(x0 + side * arm_out, NUB_Y + dy, h, side, color))  # ท่อนนอก
+        out.append(_arm(x0, arm_y + dy + h * 0.5, h, side, color))
+        out.append(_arm(x0 + side * arm_out, arm_y + dy, h, side, color))  # ท่อนนอก
     return out
 
 
@@ -250,31 +322,45 @@ STATE_SCALE: dict[str, float] = {"building": 0.875}
 GLASSES_STATES = frozenset({"writing"})
 
 
-def _skin(connected: bool, state: str) -> tuple[str, str]:
-    """คืน (สีตัว, สีตา)"""
+def _skin(connected: bool, state: str, agent: str = "claude") -> tuple[str, str, str]:
+    """คืน (สีตัว, สีตา, สีจอจม)
+
+    สีจอถูกคืนมาเสมอแม้เอเจนต์นั้นจะไม่มีจอ — `_body()` จะไม่ใช้มันเองถ้า shape.screen
+    เป็น None ผู้เรียกจึงไม่ต้องรู้ว่าเอเจนต์ไหนมีจอบ้าง
+    """
+    base, dark, sleep, eye = AGENT_SKIN.get(agent, AGENT_SKIN["claude"])
     if not connected:
-        return PAL.gray, PAL.gray_dark
+        # จอดับสนิท ไม่ใช่แค่เทาลง — ถ้าจอเป็น gray_dark เท่ากับสีตา ตาจะหายไปทั้งดวง
+        # (มองไม่เห็นบนภาพนิ่งของสถานะอื่น เพราะมีแต่ตัวที่มีจอเท่านั้นที่โดน)
+        return PAL.gray, PAL.gray_dark, PAL.ink
     if state == "sleeping":
         # หรี่ลงเล็กน้อยเท่านั้น — ถ้าเปลี่ยนสีแรงจะไปชนกับสัญญาณ "หลุดการเชื่อมต่อ"
-        return PAL.clay_dark, PAL.ink
-    return PAL.clay, PAL.ink
+        # ตัวที่มีจอได้ภาษาของตัวเองมาฟรี: ลำตัวหรี่ลงจนเกือบเท่าจอ = จอที่กำลังจะดับ
+        return dark, eye, sleep
+    return base, eye, sleep
 
 
 def build(
-    state: str, phase: float = 0.0, connected: bool = True, cycle: int = 0
+    state: str,
+    phase: float = 0.0,
+    connected: bool = True,
+    cycle: int = 0,
+    agent: str = "claude",
 ) -> RectList:
     """สร้าง rect list ของมาสคอตหนึ่งตัว เรียงจากหลังไปหน้า
 
     phase  ความคืบหน้าในลูปอนิเมชัน 0..1 (ลูปหนึ่งราว 1 วินาที)
     cycle  ลูปที่เท่าไรแล้ว — ใช้กับจังหวะที่ช้ากว่าหนึ่งลูป เช่นการกะพริบตา
+    agent  ตัวไหนใน SHAPES — คนละรูปทรง ไม่ใช่แค่คนละสี
 
-    พิกัดอยู่ในตาราง 16.5 x 12 unit ฝ่าเท้าอยู่ที่ y = 12
+    พิกัดอยู่ในตาราง 16.5 x 12 unit ฝ่าเท้าอยู่ที่ y = 12 เท่ากันทุกเอเจนต์
     """
     if state not in STATES:
         raise KeyError(f"unknown visual state: {state!r}")
     mood_name, prop_name = STATES[state]
     m = MOODS[mood_name]
-    skin, ink = _skin(connected, state)
+    skin, ink, screen = _skin(connected, state, agent)
+    shape = SHAPES.get(agent, CLAUDE_SHAPE)
 
     # ปัด dy ลงตารางพิกเซลก่อน ไม่งั้นแต่ละ rect ปัดคนละทางแล้วเห็นแค่เส้นขอบกระพริบ
     # แทนที่จะเห็นทั้งตัวเลื่อนขึ้นลงพร้อมกัน
@@ -298,7 +384,8 @@ def build(
     arm = m.arm * math.sin(phase * math.pi * 4.0)
     arm_lift = m.arm_up  # ยกค้างนิ่ง — ถ้าขยับขึ้นลงจะอ่านเป็นโบกมือ ไม่ใช่ยกค้างเพ่งพลัง
     silhouette = _squashed(
-        _body(skin, (arm - arm_lift, -arm - arm_lift), m.arm_out) + _legs(m.gait, phase, skin, m.sink * phase * LEG_H * 0.9),
+        _body(skin, (arm - arm_lift, -arm - arm_lift), m.arm_out, shape, screen)
+        + _legs(m.gait, phase, skin, m.sink * phase * shape.leg_h * 0.9, shape),
         squash,
     )
     silhouette = move(silhouette, dx, dy)
@@ -357,15 +444,53 @@ def state_box(state: str) -> tuple[float, float, float, float]:
 
 
 def build_centered(
-    state: str, phase: float = 0.0, connected: bool = True, cycle: int = 0
+    state: str,
+    phase: float = 0.0,
+    connected: bool = True,
+    cycle: int = 0,
+    agent: str = "claude",
 ) -> RectList:
     """เหมือน build() แต่เลื่อนแนวนอนให้กรอบของสถานะนั้นอยู่กึ่งกลางกรอบวาดมาตรฐาน
 
     ระดับฝ่าเท้าไม่ขยับ — จัดกึ่งกลางเฉพาะแกน x
+
+    `state_box()` ไม่รับ agent โดยตั้งใจ: ระยะเลื่อนต้องเป็นค่าเดียวกันทุกเอเจนต์
+    ไม่งั้นการสลับเอเจนต์ในช่องเดิมจะทำให้ทั้งตัวกระตุกไปด้านข้าง และฝั่ง firmware
+    ซึ่งเก็บตาราง center_dx ไว้ชุดเดียวจะไม่ตรงกับที่นี่ — `agents_share_one_box()`
+    คือตัวที่คอยยืนยันว่าข้อตกลงนี้ยังจริงอยู่
     """
     bx0, _, bx1, _ = state_box(state)
     dx = (BOX_X0 + BOX_X1) / 2.0 - (bx0 + bx1) / 2.0
-    return move(build(state, phase, connected, cycle), dx, 0.0)
+    return move(build(state, phase, connected, cycle, agent), dx, 0.0)
+
+
+def agents_share_one_box() -> list[str]:
+    """คืนรายการข้อผิดพลาด — ว่างแปลว่าทุกเอเจนต์ยังกินพื้นที่แนวนอนเท่ากัน
+
+    รูปทรงต่อเอเจนต์แก้ได้เฉพาะ *ข้างใน* ซิลลูเอ็ต ถ้าตัวไหนล้นออกด้านข้าง การจัด
+    กึ่งกลางกับเงาใต้เท้าจะเพี้ยนเงียบๆ ทีละนิดโดยไม่มีอะไรพัง — ต้องจับที่นี่
+
+    ดูเฉพาะแกน x เพราะมีแค่แกนนั้นที่ถูกใช้จริง (`build_centered`, `screen.py`,
+    และ `pch_mascot_center_dx` ฝั่ง firmware ล้วนอ่านแต่ bx0/bx1)
+
+    ขอบล่างต่างกันได้และต่างจริงในท่านั่ง/ท่าหลับ: ขาหดเป็น *สัดส่วน* ของความยาวขา
+    ตัวที่ขายาวกว่าจึงหดได้ลึกกว่า นั่นคือท่านั่งของสัตว์คนละชนิด ไม่ใช่ความผิดพลาด
+    """
+    errs: list[str] = []
+    for state in STATES:
+        wx0, _, wx1, _ = bounds([r for i in range(12) for r in build(state, i / 12.0)])
+        for agent in SHAPES:
+            if agent == "claude":
+                continue
+            gx0, _, gx1, _ = bounds(
+                [r for i in range(12) for r in build(state, i / 12.0, agent=agent)]
+            )
+            if abs(wx0 - gx0) > 1e-6 or abs(wx1 - gx1) > 1e-6:
+                errs.append(
+                    f"{agent}/{state}: x {gx0:.3f}..{gx1:.3f}"
+                    f" != claude {wx0:.3f}..{wx1:.3f}"
+                )
+    return errs
 
 
 def all_states() -> list[str]:
