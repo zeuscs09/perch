@@ -19,13 +19,15 @@ public enum Subprocess {
     public static func run(
         _ executable: String,
         _ arguments: [String],
-        timeout: TimeInterval
+        timeout: TimeInterval,
+        cwd: String? = nil
     ) -> String? {
         final class Box: @unchecked Sendable { var data = Data() }
 
         let task = Process()
         task.executableURL = URL(fileURLWithPath: executable)
         task.arguments = arguments
+        if let cwd { task.currentDirectoryURL = URL(fileURLWithPath: cwd) }
         let pipe = Pipe()
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice

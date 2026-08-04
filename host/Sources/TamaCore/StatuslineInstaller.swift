@@ -142,11 +142,16 @@ public enum StatuslineInstaller {
         input=$(cat)
 
         # เขียน cache แบบเงียบ ๆ ผลลัพธ์ของขั้นนี้ไม่มีผลต่อสิ่งที่ผู้ใช้เห็น
-        fallback=$(printf '%s' "$input" | "$BIN" --usage-cache 2>/dev/null) || fallback=""
-
+        #
+        # มี PREV = บรรทัดที่ผู้ใช้เห็นมาจาก PREV ทั้งหมด สิ่งที่เราวาดถูกโยนทิ้งเสมอ
+        # `--cache-only` จึงข้ามการวาด ซึ่งแปลว่าไม่ต้องเรียก git เลย — ห้าคำสั่ง git
+        # ทุกสิบวินาทีต่อทุก session เพื่อผลลัพธ์ที่ไม่มีใครอ่าน คือแรงกดที่ใหญ่ที่สุด
+        # ที่สคริปต์นี้วางบนเครื่อง และเป็นจุดที่เคยค้างจนกระบวนการสะสมมาแล้ว
         if [ -n "$PREV" ]; then
+            printf '%s' "$input" | "$BIN" --usage-cache --cache-only >/dev/null 2>&1 || true
             printf '%s' "$input" | sh -c "$PREV" || true
         else
+            fallback=$(printf '%s' "$input" | "$BIN" --usage-cache 2>/dev/null) || fallback=""
             [ -n "$fallback" ] && printf '%s\\n' "$fallback"
         fi
         exit 0

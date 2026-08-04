@@ -46,19 +46,24 @@ public enum GitSummary {
 
     /// คืน `nil` เมื่อ git บอกว่าล้มเหลว และคืนสตริงว่างเมื่อสำเร็จแต่ไม่มีอะไรจะบอก
     /// — สองกรณีนี้ต่างกัน (ไม่ใช่ repo กับ HEAD ที่ยังไม่มี branch)
+    /// เพดานเวลาต่อคำสั่ง git หนึ่งคำสั่ง
+    ///
+    /// git ค้างได้จริงและค้างบ่อยกว่าที่คิด: repo ใหญ่, ดิสก์ที่ยัง sync อยู่ (iCloud/Dropbox),
+    /// remote ที่ตอบช้า, หรือเครื่องที่กำลังตันจน `fork` เองก็บล็อก
+    ///
+    /// สิ่งที่ทำให้เรื่องนี้ร้ายกว่าปกติคือความถี่: ทำงานทุกสิบวินาที *ต่อทุก session*
+    /// บนเครื่องที่เปิดหลายสิบ session การรอที่ไม่มีเพดานจึงไม่ใช่ "บรรทัดสถานะช้า"
+    /// แต่เป็นกระบวนการที่ไม่มีวันตายสะสมไปเรื่อยๆ จนเครื่องหมดโควตา — เกิดขึ้นจริงแล้ว
+    ///
+    /// เป็นบั๊กชนิดเดียวกับที่ `TmuxSession` เคยมี ต่างกันแค่ว่าอันนี้เรียก git แทน tmux
+    /// การไล่หา "ที่อื่นที่รอโดยไม่มีเพดาน" หลังแก้อันแรกน่าจะเจอไฟล์นี้ตั้งแต่ตอนนั้น
+    private static let timeout: TimeInterval = 2
+
+    /// คืน `nil` เมื่อ git บอกว่าล้มเหลว และคืนสตริงว่างเมื่อสำเร็จแต่ไม่มีอะไรจะบอก
+    /// — สองกรณีนี้ต่างกัน (ไม่ใช่ repo กับ HEAD ที่ยังไม่มี branch)
     static func run(_ args: [String], in dir: String) -> String? {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        task.arguments = ["git", "--no-optional-locks"] + args
-        task.currentDirectoryURL = URL(fileURLWithPath: dir)
-        let out = Pipe()
-        task.standardOutput = out
-        task.standardError = FileHandle.nullDevice
-        guard (try? task.run()) != nil else { return nil }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        task.waitUntilExit()
-        guard task.terminationStatus == 0 else { return nil }
-        return String(decoding: data, as: UTF8.self)
+        Subprocess.run("/usr/bin/env", ["git", "--no-optional-locks"] + args,
+                       timeout: timeout, cwd: dir)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

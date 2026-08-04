@@ -1970,13 +1970,67 @@ func runAllTests() {
             "/bin/sh", ["-c", "sleep 3; echo late > '\(marker.path)'"], timeout: 0.4)
         let waited = Date().timeIntervalSince(began)
         expect(hung == nil, "a child that outlives its timeout produces nothing")
-        expect(waited < 2.0, "and we come back on time, not when it does: \(waited)s")
+        // เกณฑ์ผูกกับ *อายุของลูก* ไม่ใช่ตัวเลขที่ตั้งลอยๆ: ลูกนอน 3 วินาที การกลับมา
+        // ก่อนหน้านั้นคือสิ่งเดียวที่พิสูจน์ว่าเราไม่ได้รอมัน ส่วนจะเร็วกว่านั้นแค่ไหน
+        // ขึ้นกับว่าเครื่องยุ่งแค่ไหน ซึ่งไม่ใช่สิ่งที่เทสต์นี้ตรวจ
+        // (เคยตั้งไว้ที่ 2.0 แล้วล้มบนเครื่องที่กำลังตัน ทั้งที่ตรรกะถูกทุกอย่าง)
+        expect(waited < 3.0, "and we come back before the child would have: \(waited)s")
 
         // กลับมาตรงเวลาแต่ปล่อยลูกไว้ คือบั๊กเดิมทุกประการ — ต่างแค่ว่าใครเป็นคนค้าง
         // ให้เวลาเลย 3 วิที่ลูกตั้งใจจะเขียนไฟล์ ถ้าไฟล์ไม่โผล่แปลว่ามันถูกฆ่าจริง
         Thread.sleep(forTimeInterval: 3.4)
         expect(!FileManager.default.fileExists(atPath: marker.path),
                "and the child is dead, not merely abandoned to finish in the background")
+    }
+
+    suite("payload ของ statusline แยกจาก hook event ได้เองบนสายเดิม") {
+        // ชุดนี้ตรึงตัวแยกชนิดที่ daemon ใช้ — ทั้งสองอย่างวิ่งบน socket เส้นเดียวกัน
+        // และไม่มีตัวบอกชนิด สิ่งที่แยกได้คือ HookEvent บังคับให้มี hookEventName
+        // กับ sessionId ซึ่ง payload ของ statusline ไม่มีทั้งคู่
+        //
+        // ถ้าวันหนึ่ง HookEvent ทำให้สองฟิลด์นั้นเป็น optional ตัวแยกจะพังเงียบๆ:
+        // payload ของ statusline จะถูกอ่านเป็น event เปล่าแล้ว cache จะหยุดอัปเดต
+        let raw = #"{"model":{"display_name":"Opus 5"},"rate_limits":{}}"#
+        let msg = UsageMessage(statusline: raw)
+        let line = try Wire.encoder().encode(msg)
+
+        expect((try? JSONDecoder().decode(HookEvent.self, from: line)) == nil,
+               "ข้อความของ statusline ต้องไม่ถูกอ่านเป็น hook event")
+        equal(try JSONDecoder().decode(UsageMessage.self, from: line).statusline, raw,
+              "และต้องกลับมาเป็น payload เดิมทุกตัวอักษร")
+
+        // ทางกลับ: event จริงต้องไม่ถูกอ่านเป็นข้อความของ statusline
+        let ev = try Wire.encoder().encode(
+            HookEvent(hookEventName: "Stop", sessionId: "s1"))
+        expect((try? JSONDecoder().decode(UsageMessage.self, from: ev)) == nil,
+               "hook event ต้องไม่ถูกอ่านเป็นข้อความของ statusline")
+
+        // ไม่มี daemon = ต้องบอกว่าส่งไม่ได้ ผู้เรียกจะได้เขียนไฟล์เอง
+        let dead = FileManager.default.temporaryDirectory
+            .appendingPathComponent("no-daemon-\(UUID().uuidString).sock")
+        expect(!UsageMessage.send(Data(raw.utf8), to: dead),
+               "ไม่มี daemon ให้ส่ง ต้องคืน false ไม่ใช่กลืนเงียบ")
+        expect(!UsageMessage.send(Data(), to: dead), "ข้อมูลว่างไม่ใช่สิ่งที่ต้องส่ง")
+
+        // มี daemon จริงฟังอยู่ = ต้องส่งถึงและได้ payload เดิมกลับมาครบ
+        //
+        // เทสต์นี้เดินทั้งเส้น (encode -> unix socket -> decode) เพราะจุดที่พังได้จริง
+        // อยู่ตรงกลาง ไม่ใช่ที่ปลายทั้งสองข้าง — และเส้นนี้คือสิ่งที่มาแทนการให้ทุก
+        // session เขียนไฟล์เอง ถ้ามันเงียบๆ ส่งไม่ถึง cache จะหยุดอัปเดตโดยไม่มีใครรู้
+        let sock = FileManager.default.temporaryDirectory
+            .appendingPathComponent("usg-\(UUID().uuidString).sock")
+        defer { try? FileManager.default.removeItem(at: sock) }
+        let box = Box()
+        let server = SocketServer(path: sock) { box.append($0) }
+        try server.start()
+        defer { server.stop() }
+
+        expect(UsageMessage.send(Data(raw.utf8), to: sock), "ส่งถึง daemon ที่ฟังอยู่")
+        expect(box.wait(for: 1, timeout: 3), "daemon ได้รับข้อความ")
+        let got = box.items.first.flatMap {
+            try? JSONDecoder().decode(UsageMessage.self, from: $0)
+        }
+        equal(got?.statusline, raw, "และ payload เดินทางถึงครบทุกตัวอักษร")
     }
 
     suite("หน้าต่างที่ตายแล้วต้องไม่ทับหน้าต่างปัจจุบัน") {
@@ -2078,11 +2132,16 @@ func runAllTests() {
 /// ที่พักข้อมูลข้ามคิวสำหรับเทสต์ socket
 final class Box: @unchecked Sendable {
     private let lock = NSLock()
-    private var items: [Data] = []
+    private var stored: [Data] = []
+
+    var items: [Data] {
+        lock.lock(); defer { lock.unlock() }
+        return stored
+    }
 
     func append(_ d: Data) {
         lock.lock()
-        items.append(d)
+        stored.append(d)
         lock.unlock()
     }
 
@@ -2090,7 +2149,7 @@ final class Box: @unchecked Sendable {
         let deadline = Date() + timeout
         while Date() < deadline {
             lock.lock()
-            let n = items.count
+            let n = stored.count
             lock.unlock()
             if n >= count { return true }
             usleep(20_000)

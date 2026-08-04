@@ -17,7 +17,19 @@ public enum HookClient {
 
     public static func run(input: FileHandle = .standardInput) -> Int32 {
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + deadline) {
-            exit(0)  // คืน 0 เสมอ — hook ที่คืนค่าผิดจะไปทำให้ session ของผู้ใช้พัง
+            // `_exit` ไม่ใช่ `exit` — และนี่คือความต่างที่ทำให้เครื่องล่มมาแล้วหนึ่งครั้ง
+            //
+            // `exit()` รัน atexit handler, ปิด stdio, เรียก destructor — ทั้งหมดนี้ต้องการ
+            // ล็อกที่เธรดอื่นอาจถืออยู่ ในไฟล์นี้เธรดหลักบล็อกค้างใน `readToEnd()` พร้อม
+            // ล็อกของ stdio อยู่พอดี ตัวจับเวลาที่เรียก `exit()` จึงเข้าไป deadlock ตอนออก
+            // แล้วกระบวนการค้างอยู่ในสถานะ "กำลังจะตาย" ตลอดกาล (ps ขึ้น `E`) —
+            // ฆ่าไม่ได้ เก็บศพไม่ได้ สะสมนาทีละ 73 ตัวจนเครื่องเต็ม
+            //
+            // `_exit()` เป็น syscall ตรงๆ ไม่แตะล็อกอะไรเลย ซึ่งเป็นสิ่งเดียวที่ปลอดภัย
+            // สำหรับตัวจับเวลาที่ต้องทำงานได้แม้ตอนที่ส่วนอื่นของกระบวนการค้างอยู่
+            //
+            // ไม่มีอะไรต้องเก็บกวาดจริงๆ ด้วย: hook ตัวนี้เขียนแค่ socket ที่ปิดเองอยู่แล้ว
+            _exit(0)  // คืน 0 เสมอ — hook ที่คืนค่าผิดจะไปทำให้ session ของผู้ใช้พัง
         }
         guard let raw = try? input.readToEnd(), !raw.isEmpty else { return 0 }
         guard var event = try? JSONDecoder().decode(HookEvent.self, from: raw) else {

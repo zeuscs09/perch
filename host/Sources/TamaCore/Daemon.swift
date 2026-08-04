@@ -77,6 +77,16 @@ public final class Daemon {
                 self.store.apply(event, now: Date())
                 self.publish()
             } catch {
+                // ไม่ใช่ hook event — ลอง payload ของ statusline
+                //
+                // แยกได้โดยไม่ต้องมีตัวบอกชนิด เพราะ `HookEvent` บังคับให้มี
+                // `hookEventName` กับ `sessionId` ซึ่ง payload นี้ไม่มีทั้งคู่
+                if let msg = try? JSONDecoder().decode(UsageMessage.self, from: line) {
+                    // daemon เป็นผู้เขียน cache คนเดียว — ดูเหตุผลใน UsageMessage.swift
+                    UsageWriter.ingest(Data(msg.statusline.utf8))
+                    self.publish()
+                    return
+                }
                 Log.debug("bad event: \(error)")
             }
         }

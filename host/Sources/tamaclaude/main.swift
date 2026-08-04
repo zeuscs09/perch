@@ -53,11 +53,32 @@ func cacheTarget(_ args: [String]) -> URL {
     return URL(fileURLWithPath: args[1])
 }
 
+/// เพดานอายุของโหมดที่อายุสั้นและถูกเรียกถี่
+///
+/// ต้องครอบ *ทุก* โหมดแบบนั้น ไม่ใช่แค่โหมดที่เคยมีปัญหา — บทเรียนที่จ่ายไปด้วยการที่
+/// เครื่องของผู้ใช้เต็มสองรอบ: รอบแรกใส่เพดานให้ `--hook` เพราะมันคือตัวที่เห็นว่าค้าง
+/// แต่ `--usage-cache` ถูกเรียกถี่กว่าอีก (ทุก 10 วินาที ต่อทุก session) และไม่มีใครดูแล
+/// มันจึงมารั่วแทนในรอบถัดมา
+///
+/// `_exit` ไม่ใช่ `exit`: `exit()` รัน atexit handler และปิด stdio ซึ่งต้องการล็อกที่
+/// เธรดที่ค้างอยู่อาจถืออยู่ ตัวจับเวลาที่เรียก `exit()` จะ deadlock ตอนออกแล้วกระบวนการ
+/// ค้างในสถานะ "กำลังจะตาย" ตลอดกาล — ฆ่าไม่ได้ เก็บศพไม่ได้ ต้องรีสตาร์ตเครื่องอย่างเดียว
+/// (วัดจากเครื่องจริง: สะสมนาทีละ 79 ตัว)
+func armDeadline(_ seconds: TimeInterval = 10) {
+    DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + seconds) {
+        // เทของที่ค้างในบัฟเฟอร์ก่อน — โหมดพวกนี้พิมพ์บรรทัดออก stdout และบรรทัดที่
+        // ขาดครึ่งแย่กว่าบรรทัดที่ไม่มี ส่วน fflush ไม่แตะล็อกที่ทำให้ exit ค้าง
+        fflush(stdout)
+        _exit(0)
+    }
+}
+
 switch args.first {
 case "--hook":
     exit(HookClient.run())
 
 case "--send":
+    armDeadline()
     guard args.count > 1, let data = args[1].data(using: .utf8) else {
         fail("--send needs a JSON string")
     }
@@ -91,17 +112,32 @@ case "--remove-statusline":
     }
 
 case "--usage-cache":
+    armDeadline()
+    // ธงต้องไม่ถูกอ่านเป็นพาธ cache — `cacheTarget` ปฏิเสธทุกอย่างที่ขึ้นต้นด้วย `-`
+    // (โดยตั้งใจ เพื่อจับธงที่พิมพ์ผิด) จึงต้องคัดธงที่รู้จักออกก่อนส่งให้มัน
+    let cacheOnly = args.contains("--cache-only")
+    let cacheArgs = args.filter { $0 != "--cache-only" }
     // เรียกจาก statusline.sh เท่านั้น — ต้องไม่ตายและไม่บ่นไม่ว่า stdin จะเป็นอะไร
     // เพราะ exit code ที่ไม่ใช่ 0 จะไปโผล่เป็นบรรทัด statusline ที่พังของผู้ใช้
     let stdin = FileHandle.standardInput.readDataToEndOfFile()
-    let target = cacheTarget(args)
-    let short = UsageWriter.ingest(stdin, to: target)
+    let target = cacheTarget(cacheArgs)
+    // ส่งให้ daemon เขียนแทนเมื่อทำได้ — ผู้เขียนคนเดียวไม่มีคิว `rename()` ให้ค้าง
+    // (ดูเหตุผลเต็มใน UsageMessage.swift) ถอยไปเขียนเองเมื่อไม่มี daemon เพื่อให้
+    // โหมดนี้ยังใช้ได้ลำพัง และเพื่อไม่ให้ cache หยุดอัปเดตตอน daemon ปิดอยู่
+    let viaDaemon = args.count <= 1 && UsageMessage.send(stdin, to: Paths.socket)
+    let short = viaDaemon ? nil : UsageWriter.ingest(stdin, to: target)
+    // `--cache-only`: เขียน cache แล้วจบ ไม่ต้องวาดบรรทัด
+    //
+    // สคริปต์ statusline ที่ส่งงานวาดต่อให้คำสั่งเดิมของผู้ใช้ ไม่เคยใช้บรรทัดที่เราวาดเลย
+    // การวาดแปลว่าเรียก git ห้าคำสั่ง ทุกสิบวินาที ต่อทุก session เพื่อสตริงที่ถูกทิ้งทันที
+    if cacheOnly { exit(0) }
     // เขียน cache ก่อนแล้วค่อยวาด — บรรทัดที่วาดต้องเห็นตัวเลขของ render รอบนี้ ไม่ใช่รอบก่อน
     // ถ้าวาดไม่ออก (payload อ่านไม่ได้) ยังเหลือบรรทัดสั้นแบบเดิมไว้ ดีกว่าไม่มีอะไรเลย
     if let line = StatuslineRender.line(json: stdin, cacheURL: target) ?? short { print(line) }
     exit(0)
 
 case "--usage-poll":
+    armDeadline(60)  // ยิง API จริง ให้เวลามากกว่าโหมดที่อ่านแต่ไฟล์
     // โปรเซสอายุสั้นโดยตั้งใจ ไม่ใช่ daemon — ตัวจับเวลาอยู่ที่ผู้เรียก
     // exit code แยก "ผู้ใช้ต้องไปแปะ key ใหม่" ออกจาก "เน็ตสะดุด เดี๋ยวก็หาย"
     do {
