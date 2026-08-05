@@ -258,6 +258,44 @@ static void apply_night(void)
     pch_dim_set_night(night);
 }
 
+// เปลี่ยนเป็น 1 แล้วแฟลช = จอกลายเป็นสีทึบเต็มพื้นที่ ไม่ทำอย่างอื่นเลย
+//
+// มีไว้วัดขอบจอเพื่อออกแบบกรอบกล่อง — ปัญหาคือ UI ปกติมีแถบบนสีเข้มซึ่งกลืนไปกับขอบดำ
+// ของกระจก ทำให้แยกไม่ออกจากรูปถ่ายว่า "ขอบจอจบตรงไหน ภาพเริ่มตรงไหน" สีทึบสว่างเต็มจอ
+// ทำให้เส้นแบ่งนั้นคมจนวัดจากรูปได้ตรงๆ
+//
+// วัดเสร็จเปลี่ยนกลับเป็น 0 แล้วแฟลชใหม่
+#ifndef PCH_CALIBRATION
+#define PCH_CALIBRATION 0
+#endif
+
+#if PCH_CALIBRATION
+// ม่วงบานเย็น ไม่ใช่ขาว — ขาวล้นกล้องง่ายจนขอบฟุ้ง และสีนี้ไม่ไปซ้ำกับอะไรในฉากเลย
+// (กล่องส้ม โต๊ะไม้ มือ) การคัดสีจากรูปจึงเหลือเป็นการเลือกช่วงสีเดียว
+#define CAL_FILL 0xF81F
+// แถบเขียวขอบบน 4 พิกเซล — บอกว่าด้านไหนคือด้านบน รูปที่ถ่ายมาเอียงหรือกลับหัวจะได้รู้
+#define CAL_MARK 0x07E0
+#define CAL_MARK_H 4
+
+static void calibration_screen(void)
+{
+    // ไล่ทีละแถว ไม่ได้ทำทั้งจอทีเดียว — เต็มจอคือ 320*240*2 = 150 KB ซึ่งเกินแรมที่มี
+    static uint8_t row[PCH_SCREEN_WIDTH * 2];
+    for (int y = 0; y < PCH_SCREEN_HEIGHT; y++) {
+        uint16_t c = (y < CAL_MARK_H) ? CAL_MARK : CAL_FILL;
+        for (int x = 0; x < PCH_SCREEN_WIDTH; x++) {
+            // สลับไบต์เอง เพราะทางปกติผ่าน lv_draw_sw_rgb565_swap() ก่อน blit
+            // ตรงนี้ไม่ได้ผ่าน LVGL เลย ถ้าไม่สลับจะได้สีคนละสีโดยไม่มีอะไรฟ้อง
+            row[x * 2] = (uint8_t)(c >> 8);
+            row[x * 2 + 1] = (uint8_t)(c & 0xFF);
+        }
+        pch_lcd_blit(0, y, PCH_SCREEN_WIDTH - 1, y, row, sizeof(row));
+    }
+    pch_lcd_set_backlight(100);
+    ESP_LOGW("cal", "โหมดสอบเทียบ: จอค้างเป็นสีทึบ แถบเขียวคือด้านบน");
+}
+#endif
+
 void app_main(void)
 {
     esp_err_t err = nvs_flash_init();
@@ -270,6 +308,11 @@ void app_main(void)
     s_lock = xSemaphoreCreateMutex();
     pch_mascot_init();
     pch_lcd_init();
+#if PCH_CALIBRATION
+    // ออกก่อนทุกอย่าง — ไม่เปิด BLE ไม่เปิด WiFi ไม่มีอะไรมาวาดทับ
+    calibration_screen();
+    return;
+#endif
     pch_led_init();
     pch_touch_init();
     pch_dim_init();
