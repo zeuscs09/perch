@@ -1,5 +1,6 @@
 import Foundation
 import PerchCore
+import ServiceManagement
 
 let usage = """
 perch — Claude Code session display for the CYD board
@@ -11,6 +12,7 @@ usage:
   perch --install-hooks     write the hook entries into ~/.claude/settings.json
   perch --install-statusline  take over statusLine.command to capture rate_limits
   perch --remove-statusline   give the statusLine slot back to the previous command
+  perch --install-login     start at login (registers the .app this binary lives in)
   perch --usage-cache       read statusline JSON on stdin, write the usage cache
   perch --usage-poll        ask claude.ai for the quota once, write the cache, exit
   perch --send <json>       send one hand-written event (for testing)
@@ -109,6 +111,25 @@ case "--remove-statusline":
         Log.info("statusline slot restored")
     } catch {
         fail("could not remove statusline: \(error)")
+    }
+
+case "--install-login":
+    // `SMAppService.mainApp` ลงทะเบียน *bundle ของโปรเซสที่เรียก* จึงต้องรันจากไบนารีที่อยู่
+    // ใน .app ตัวที่อยากให้เปิดตอน login — รันจาก .build/ จะลงทะเบียนของผิดตัวโดยไม่ฟ้อง
+    guard Bundle.main.bundleURL.pathExtension == "app" else {
+        fail("run this from inside the .app bundle, not \(Bundle.main.bundleURL.path)")
+    }
+    // ไม่ toggle: เรียกซ้ำต้องไม่ปิดของที่เปิดอยู่ ต่างจากปุ่มในหน้าตั้งค่าที่ผู้ใช้กดเอง
+    // — ตัวติดตั้งที่สลับค่าจะ "ติดตั้ง" ทับตัวเองจนกลายเป็นปิดเมื่อรันสองครั้ง
+    if SMAppService.mainApp.status == .enabled {
+        Log.info("already starts at login: \(Bundle.main.bundleURL.path)")
+    } else {
+        do {
+            try SMAppService.mainApp.register()
+            Log.info("will start at login: \(Bundle.main.bundleURL.path)")
+        } catch {
+            fail("could not register the login item: \(error)")
+        }
     }
 
 case "--usage-cache":
