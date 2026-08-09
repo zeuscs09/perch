@@ -15,6 +15,7 @@
 #include "pch_mascot.h"
 #include "pch_model.h"
 #include "pch_ui.h"
+#include "pch_face.h"
 #include "pch_wifi.h"
 #include "esp_log.h"
 #include "esp_system.h"
@@ -27,6 +28,31 @@
 #include "nvs_flash.h"
 
 static const char *TAG = "main";
+
+// โหมดทดลองใบหน้า — บิลด์ด้วย `idf.py -DPCH_FACE=1 build` ค่าปกติคือปิด
+// ตั้งใจให้เป็นธงคอมไพล์ ไม่ใช่ค่ารันไทม์ เพราะโหมดนี้ไม่คืนค่าและกินจอทั้งใบ
+#ifndef PCH_FACE
+#define PCH_FACE 0
+#endif
+#ifndef PCH_RELAYTEST
+#define PCH_RELAYTEST 0
+#endif
+// ตั้งที่อยู่ relay ตอนบูตครั้งเดียวสำหรับการพัฒนา ค่าจะถูกจดลง NVS จึงอยู่ต่อแม้ flash
+// ตัวที่ไม่มีธงนี้ทับ — ของจริงมาทาง BLE
+//
+//   idf.py -DPCH_RELAY_BOOTSTRAP=1 -DPCH_RELAY_HOST=\"1.2.3.4\" -DPCH_RELAY_PORT=7333
+//
+// **ไม่มีที่อยู่จริงเป็นค่าเริ่มต้น** — relay คือเซิร์ฟเวอร์ของใครสักคน การฝังไว้ใน repo
+// แปลว่าบอร์ดของทุกคนที่โหลดไปจะวิ่งไปหาเครื่องนั้นโดยเจ้าของไม่ได้เลือก
+#ifndef PCH_RELAY_BOOTSTRAP
+#define PCH_RELAY_BOOTSTRAP 0
+#endif
+#ifndef PCH_RELAY_HOST
+#define PCH_RELAY_HOST "192.0.2.1"     // TEST-NET-1 — ต่อไม่ติดโดยตั้งใจ
+#endif
+#ifndef PCH_RELAY_PORT
+#define PCH_RELAY_PORT 7333
+#endif
 
 // บัฟเฟอร์วาดของ LVGL: 1/10 ของจอสองก้อน (~15KB) ไม่ใช่ framebuffer เต็ม 150KB
 // บอร์ดนี้ไม่มี PSRAM จึงไม่มีทางเลือกอื่นอยู่แล้ว
@@ -84,6 +110,15 @@ static bool lan_command(const char *json, int len)
     bool mine = cJSON_IsString(cmd) && strcmp(cmd->valuestring, "key") == 0;
     if (mine && !pch_lan_set_key(cJSON_IsString(key) ? key->valuestring : NULL)) {
         ESP_LOGW(TAG, "lan key rejected");
+    }
+    // ที่อยู่ relay มาช่องเดียวกับกุญแจ ด้วยเหตุผลเดียวกัน: ช่องนี้บังคับเข้ารหัส BLE
+    // อยู่แล้ว และทั้งสองอย่างเป็นการตั้งค่าของทางเดินเดียวกัน
+    if (!mine && cJSON_IsString(cmd) && strcmp(cmd->valuestring, "relay") == 0) {
+        const cJSON *host = cJSON_GetObjectItem(root, "h");
+        const cJSON *port = cJSON_GetObjectItem(root, "p");
+        pch_lan_set_relay(cJSON_IsString(host) ? host->valuestring : NULL,
+                          cJSON_IsNumber(port) ? (uint16_t)port->valuedouble : 0);
+        mine = true;
     }
     cJSON_Delete(root);
     // ตอบกลับด้วยสถานะเต็มใบ ไม่ใช่ ack เปล่า — Mac ต้องเห็นลายนิ้วมือใหม่เพื่อรู้ว่า
@@ -181,6 +216,9 @@ static void on_wifi_status(pch_wifi_state_t st, const char *ssid, const char *ip
     cJSON_AddStringToObject(root, "ip", ip ? ip : "");
     // ลายนิ้วมือกุญแจ LAN — ว่างแปลว่ายังไม่เคยตั้ง Mac จะได้รู้ว่าต้องส่งไปให้
     cJSON_AddStringToObject(root, "kf", pch_lan_key_fingerprint());
+    // Mac ต้องรู้ id นี้เพื่อบอก relay ว่าจะคุยกับบอร์ดตัวไหน — บอร์ดเป็นคนสร้างเอง
+    // ไม่ให้ Mac ตั้ง เพราะมันคือความลับที่กันคนอื่นมาเตะบอร์ดหลุด
+    cJSON_AddStringToObject(root, "did", pch_lan_device_id());
     if (err && err[0]) cJSON_AddStringToObject(root, "er", err);
 
     // รายชื่อที่จำไว้เดินทางมากับสถานะ ไม่ใช่คำสั่งแยก — หน้าตั้งค่าต้องการทั้งคู่พร้อมกัน
@@ -330,6 +368,13 @@ void app_main(void)
     lv_display_set_buffers(disp, s_buf1, s_buf2, DRAW_BUF_PX * sizeof(lv_color_t),
                            LV_DISPLAY_RENDER_MODE_PARTIAL);
 
+#if PCH_FACE
+    // โหมดทดลองใบหน้า — ออกก่อนจะไปแตะ BLE/WiFi/LED ทั้งหมด เหมือนโหมด calibration
+    // ไม่คืนค่า จอจะค้างอยู่ที่หน้าที่ขยับปากอย่างเดียว
+    pch_lcd_set_backlight(100);
+    pch_face_run();
+#endif
+
     pch_ui_init();
     pch_ui_set_connected(false);
     pch_ui_set_link(false, false, NULL);
@@ -350,6 +395,14 @@ void app_main(void)
     pch_wifi_init(&wifi_cbs);
     // snapshot ที่มาทาง LAN เข้าประตูเดียวกับที่มาทาง BLE — สองทางเดิน ปลายทางเดียว
     pch_lan_init(on_state);
+#if PCH_RELAY_BOOTSTRAP
+    pch_lan_set_relay(PCH_RELAY_HOST, PCH_RELAY_PORT);
+#endif
+#if PCH_RELAYTEST
+    // วัด heap ตอนถือ outbound TCP — เริ่มหลังทุกอย่างขึ้นครบ เพื่อให้ตัวเลขสะท้อนของจริง
+    void pch_relaytest_start(void);
+    pch_relaytest_start();
+#endif
     ESP_LOGI(TAG, "ready");
 
     const int step_ms = 10;

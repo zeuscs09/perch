@@ -36,5 +36,17 @@ const char *pch_lan_key_fingerprint(void);
 // เปิด/ปิด server ตาม IP ที่ได้จาก DHCP — mDNS ถูกประกาศตอนขึ้นด้วย
 void pch_lan_set_up(bool up, const char *ip);
 
+// ตั้ง relay กลางทางสำหรับตอนอยู่คนละเครือข่ายกับ Mac — host ว่างคือปิดทางนี้
+//
+// บอร์ดจะ *วิ่งออก* ไปหา relay เอง จึงไม่ติด NAT และเปิดคู่กับ listener ได้ (ซ็อกเก็ต
+// ขาออกวัดแล้วกิน heap ~556 ไบต์) Mac เป็นคนเลือกว่าจะเข้ามาทางตรงหรือทาง relay
+void pch_lan_set_relay(const char *host, uint16_t port);
+
+// id ที่บอร์ดใช้แนะนำตัวกับ relay — สุ่มครั้งเดียวตอนใช้ครั้งแรกแล้วจดไว้ใน NVS
+//
+// **เป็นความลับ** ไม่ใช่ชื่อเรียก: relay ไม่มีกุญแจไว้ยืนยันตัวตนใคร คนที่รู้ id นี้จึง
+// เตะบอร์ดหลุดได้ (อ่านข้อมูลไม่ได้ เพราะปิดผนึก AES-GCM ปลายทางถึงปลายทาง)
+const char *pch_lan_device_id(void);
+
 // มี Mac ต่ออยู่จริงไหม — ต่างจาก "WiFi ติด" ตรงที่อันนี้แปลว่า snapshot ยังไหลอยู่
 bool pch_lan_client_connected(void);

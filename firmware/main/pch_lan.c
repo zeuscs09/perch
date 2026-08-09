@@ -4,9 +4,12 @@
 
 #include "pch_ble.h"
 #include "esp_log.h"
+#include "esp_random.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "lwip/inet.h"
 #include "lwip/sockets.h"
 #include "mbedtls/gcm.h"
 #include "mbedtls/sha256.h"
@@ -18,6 +21,14 @@ static const char *TAG = "lan";
 #define NVS_NS "tamalan"
 #define KEY_BLOB "key"
 #define KEY_FLOOR "floor"
+#define KEY_RHOST "rhost"
+#define KEY_RPORT "rport"
+#define KEY_DEVID "devid"
+
+// device-id ยาว 22 ตัวจากชุด 64 = 132 บิต — relay ไม่ถือกุญแจอะไรเลย มันจึงยืนยันตัวตน
+// ใครไม่ได้ และกฎ "สายใหม่เตะสายเก่า" (ซึ่งจำเป็น ไม่งั้นบอร์ดที่เน็ตหลุดกลับเข้าไม่ได้)
+// แปลว่าคนที่เดา id ถูกเตะบอร์ดหลุดได้ — id จึงต้องเป็นความลับ ไม่ใช่ชื่อเรียกสวยๆ
+#define DEVID_LEN 22
 
 // จดตัวนับลง NVS ทุก 256 เฟรม ไม่ใช่ทุกเฟรม — snapshot เดินทางทุกไม่กี่วินาที
 // การเขียน flash ทุกครั้งจะกินอายุเซกเตอร์หมดภายในไม่กี่เดือน ราคาของช่วงห่างนี้คือ
@@ -56,6 +67,19 @@ static int s_listen = -1;
 static int s_client = -1;
 static bool s_mdns_up;
 
+// --- ทางออกนอกบ้าน: บอร์ดวิ่งไปหา relay เอง (issue #1) -----------------------------
+//
+// เปิดพร้อม listener ได้เลย ไม่ต้องเลือกอย่างใดอย่างหนึ่ง — วัดแล้วซ็อกเก็ตขาออกกิน
+// heap แค่ ~556 ไบต์ จาก 23.6KB ที่เหลือตอนต่ำสุด Mac เป็นคนเลือกว่าจะเข้าทางไหน
+static char s_rhost[64];
+static uint16_t s_rport;
+static char s_devid[DEVID_LEN + 1];
+static int s_relay = -1;
+// ทักซ้ำจนกว่าจะได้เฟรมแรก: relay ไม่เก็บคิว บอร์ดต่อก่อน Mac เสมอ คำทักทายใบแรกจึง
+// หายไปในความว่างเปล่า และ Mac ที่ต่อกลับรอบสองก็ต้องได้ยินใหม่ด้วย
+static bool s_relay_paired;
+static int64_t s_relay_greet_ms;
+
 // --- NVS ----------------------------------------------------------------------
 static void store_load(void)
 {
@@ -70,7 +94,33 @@ static void store_load(void)
         s_floor = floor;
         s_seen = floor;
     }
+    size_t n = sizeof(s_rhost);
+    if (nvs_get_str(h, KEY_RHOST, s_rhost, &n) != ESP_OK) s_rhost[0] = '\0';
+    uint16_t port = 0;
+    if (nvs_get_u16(h, KEY_RPORT, &port) == ESP_OK) s_rport = port;
+    n = sizeof(s_devid);
+    if (nvs_get_str(h, KEY_DEVID, s_devid, &n) != ESP_OK) s_devid[0] = '\0';
     nvs_close(h);
+}
+
+/// สร้าง device-id ครั้งเดียวตลอดชีพของบอร์ด แล้วจดไว้
+///
+/// สร้างเองไม่ให้ Mac เป็นคนตั้ง เพราะมันคือความลับที่กันคนอื่นมาเตะบอร์ดหลุด และ
+/// esp_random() หลัง WiFi เริ่มแล้วเป็น TRNG จริง ไม่ใช่ PRNG ที่เดาได้จากเวลาเปิดเครื่อง
+static void ensure_devid(void)
+{
+    if (s_devid[0]) return;
+    static const char AB[] =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_";
+    for (int i = 0; i < DEVID_LEN; i++) s_devid[i] = AB[esp_random() % 64];
+    s_devid[DEVID_LEN] = '\0';
+    nvs_handle_t h;
+    if (nvs_open(NVS_NS, NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_str(h, KEY_DEVID, s_devid);
+        nvs_commit(h);
+        nvs_close(h);
+    }
+    ESP_LOGI(TAG, "device id %s (สร้างใหม่)", s_devid);
 }
 
 static void store_floor(void)
@@ -243,6 +293,66 @@ static void take_client(int fd)
     ESP_LOGI(TAG, "mac connected");
 }
 
+// --- ทางออกนอกบ้าน ---------------------------------------------------------------
+static void close_relay(void)
+{
+    if (s_relay < 0) return;
+    close(s_relay);
+    s_relay = -1;
+    s_relay_paired = false;
+}
+
+static bool open_relay(void)
+{
+    if (!s_rhost[0] || !s_rport) return false;
+    ensure_devid();
+
+    int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (fd < 0) return false;
+    struct sockaddr_in dst = {.sin_family = AF_INET, .sin_port = htons(s_rport)};
+    dst.sin_addr.s_addr = inet_addr(s_rhost);
+    // ปลายทางข้ามทวีป จับมือช้ากว่าใน LAN มาก — 5 วินาทีตัดสายที่กำลังจะติดทิ้ง
+    struct timeval tv = {.tv_sec = 15, .tv_usec = 0};
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    if (connect(fd, (struct sockaddr *)&dst, sizeof(dst)) != 0) {
+        close(fd);
+        return false;
+    }
+    char hello[80];
+    int n = snprintf(hello, sizeof(hello), "B %s\n", s_devid);
+    if (send(fd, hello, n, 0) != n) {
+        close(fd);
+        return false;
+    }
+    int on = 1, idle = 20, intvl = 10, cnt = 3;
+    setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
+    setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle));
+    setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &intvl, sizeof(intvl));
+    setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &cnt, sizeof(cnt));
+    tv.tv_sec = 5;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    s_relay = fd;
+    s_relay_paired = false;
+    s_relay_greet_ms = 0;
+    ESP_LOGI(TAG, "ต่อ relay %s:%u แล้ว id %s", s_rhost, s_rport, s_devid);
+    return true;
+}
+
+/// ทักซ้ำทุก 2 วินาทีจนกว่าจะได้เฟรมแรก
+///
+/// relay ไม่เก็บคิวโดยตั้งใจ (ไม่งั้นข้อมูลเก่าจะถูกเล่นซ้ำใส่ Mac ที่เพิ่งต่อเข้ามา)
+/// คำทักทายที่ส่งตอนยังไม่มีใครอยู่ปลายทางจึงหายไปเฉยๆ — และ Mac *ต้อง* ได้ยินมัน
+/// เพราะมันคือที่มาของเลขตัวนับที่ Mac ใช้ตั้งต้น การทักซ้ำจึงถูกกว่าการทำให้ relay ฉลาด
+static void relay_tick(void)
+{
+    if (s_relay < 0 || s_relay_paired) return;
+    int64_t now = esp_timer_get_time() / 1000;
+    if (now - s_relay_greet_ms < 2000) return;
+    s_relay_greet_ms = now;
+    greet(s_relay);
+}
+
 static void serve(void)
 {
     fd_set fds;
@@ -253,8 +363,15 @@ static void serve(void)
         FD_SET(s_client, &fds);
         if (s_client > high) high = s_client;
     }
+    if (s_relay >= 0) {
+        FD_SET(s_relay, &fds);
+        if (s_relay > high) high = s_relay;
+    }
     struct timeval tv = {.tv_sec = 0, .tv_usec = 500000};
-    if (select(high + 1, &fds, NULL, NULL, &tv) <= 0) return;
+    if (select(high + 1, &fds, NULL, NULL, &tv) <= 0) {
+        relay_tick();
+        return;
+    }
 
     if (FD_ISSET(s_listen, &fds)) {
         int fd = accept(s_listen, NULL, NULL);
@@ -266,6 +383,19 @@ static void serve(void)
             close_client();
         }
     }
+    if (s_relay >= 0 && FD_ISSET(s_relay, &fds)) {
+        if (read_frame(s_relay)) {
+            // เฟรมแรกที่ถอดรหัสผ่าน = มี Mac จริงอยู่ปลายทางแล้ว เลิกทัก
+            if (!s_relay_paired) {
+                s_relay_paired = true;
+                ESP_LOGI(TAG, "relay: จับคู่กับ Mac แล้ว");
+            }
+        } else {
+            ESP_LOGI(TAG, "relay: สายขาด");
+            close_relay();
+        }
+    }
+    relay_tick();
 }
 
 static void lan_task(void *arg)
@@ -273,12 +403,22 @@ static void lan_task(void *arg)
     while (1) {
         if (!s_up) {
             close_listen();
+            close_relay();
             vTaskDelay(pdMS_TO_TICKS(500));
             continue;
         }
         if (s_listen < 0 && !open_listen()) {
             vTaskDelay(pdMS_TO_TICKS(2000));
             continue;
+        }
+        // ลองต่อ relay ใหม่เป็นระยะ ไม่ใช่รัวๆ — เน็ตมือถือหลุดเป็นเรื่องปกติ และ
+        // การ connect() ที่ล้มก็ยังกิน RAM ชั่วขณะ
+        if (s_relay < 0 && s_rhost[0]) {
+            static int64_t next_try;
+            int64_t now = esp_timer_get_time() / 1000;
+            if (now >= next_try) {
+                if (!open_relay()) next_try = now + 10000;
+            }
         }
         serve();
     }
@@ -369,4 +509,30 @@ void pch_lan_set_up(bool up, const char *ip)
     announce();
 }
 
-bool pch_lan_client_connected(void) { return s_client >= 0; }
+bool pch_lan_client_connected(void) { return s_client >= 0 || s_relay_paired; }
+
+void pch_lan_set_relay(const char *host, uint16_t port)
+{
+    // ค่าว่าง = ปิดทางนี้ทิ้ง ไม่ใช่ "ไม่เปลี่ยน" — ผู้ใช้ต้องถอนออกได้
+    char h[sizeof(s_rhost)] = {0};
+    if (host) snprintf(h, sizeof(h), "%s", host);
+    if (strcmp(h, s_rhost) == 0 && port == s_rport) return;
+    snprintf(s_rhost, sizeof(s_rhost), "%s", h);
+    s_rport = port;
+    close_relay();          // ปลายทางเปลี่ยน สายที่ค้างอยู่ไปผิดที่แล้ว
+
+    nvs_handle_t nh;
+    if (nvs_open(NVS_NS, NVS_READWRITE, &nh) == ESP_OK) {
+        nvs_set_str(nh, KEY_RHOST, s_rhost);
+        nvs_set_u16(nh, KEY_RPORT, s_rport);
+        nvs_commit(nh);
+        nvs_close(nh);
+    }
+    ESP_LOGI(TAG, "relay = %s:%u", s_rhost[0] ? s_rhost : "(ไม่ใช้)", s_rport);
+}
+
+const char *pch_lan_device_id(void)
+{
+    ensure_devid();
+    return s_devid;
+}
