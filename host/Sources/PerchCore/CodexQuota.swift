@@ -44,7 +44,28 @@ public enum CodexQuota {
         return Window(percent: percent, remaining: remaining, window: max(60, minutes * 60))
     }
 
+    /// ผลของการเดินไดเรกทอรีครั้งล่าสุด — คีย์ด้วย root เผื่อถูกเรียกด้วยรากคนละอัน
+    ///
+    /// จำเป็นเพราะ `publish()` ถูกเรียก *ทุกเหตุการณ์* จากทุก session ที่เปิดอยู่ ส่วนนี่
+    /// enumerate ทั้งต้นไม้แล้วเรียก resourceValues ทีละไฟล์ — วัดจากเครื่องจริง: 614 ไฟล์
+    /// ในโฟลเดอร์ 4.4 GB และ sample แสดงว่ามันกิน 135 จาก 266 samples ของคิว perch.daemon
+    /// ซึ่งเป็นคิวเรียงลำดับ งาน publish จึงกองกันจน snapshot หยุดไหลและนาฬิกาบนบอร์ดค้าง
+    ///
+    /// 10 วินาทีพอ: โควตาที่ช้าไป 10 วินาทีไม่มีใครสังเกต แต่การเดิน 614 ไฟล์วินาทีละหลายรอบ
+    /// สังเกตได้ทันทีเพราะทุกอย่างหลังมันหยุดหมด
+    private static let scanTTL: TimeInterval = 10
+    private static var cachedScan: (root: URL, at: Date, result: URL?)?
+
     private static func newestSession(root: URL, now: Date) -> URL? {
+        if let c = cachedScan, c.root == root, now.timeIntervalSince(c.at) < scanTTL {
+            return c.result
+        }
+        let found = scanForNewestSession(root: root, now: now)
+        cachedScan = (root, now, found)
+        return found
+    }
+
+    private static func scanForNewestSession(root: URL, now: Date) -> URL? {
         let fm = FileManager.default
         guard let walker = fm.enumerator(at: root, includingPropertiesForKeys: [.contentModificationDateKey])
         else { return nil }

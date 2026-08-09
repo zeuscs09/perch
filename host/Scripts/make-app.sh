@@ -42,7 +42,22 @@ cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 # ลายเซ็น adhoc: พอสำหรับเครื่องที่บิลด์เอง แต่สิทธิ์ TCC ผูกกับ cdhash
 # บิลด์ใหม่ = ตัวตนใหม่ = macOS ถามสิทธิ์ Bluetooth อีกรอบ
 # การแจกให้เครื่องอื่นต้องใช้ Developer ID + notarization ซึ่งต้องมีบัญชีนักพัฒนา
-codesign --force --deep --sign - --identifier com.perch.daemon "$APP" >/dev/null
+# เซ็นด้วยใบรับรองที่คงที่ถ้ามี ไม่งั้นถอยไป adhoc
+#
+# ทำไมสำคัญ: adhoc (`--sign -`) ทำให้ macOS ระบุตัวแอปด้วย cdhash ซึ่ง **เปลี่ยนทุกครั้ง
+# ที่บิลด์** สิทธิ์ Bluetooth ที่ผู้ใช้กดอนุญาตไว้จึงหมดความหมายทันทีที่ติดตั้งทับ และ
+# อาการที่ได้คือจอค้างเงียบๆ โดยไม่มี error ที่ไหนเลย — เสียเวลาไล่หาสาเหตุนานมาก
+#
+# ใบรับรอง self-signed แก้ได้เพราะ designated requirement ผูกกับใบรับรอง ไม่ใช่ cdhash
+# สร้างครั้งเดียวด้วย openssl แล้ว `security add-trusted-cert -p codeSign`
+SIGN_ID="${PERCH_SIGN_ID:-Perch Local Signing}"
+if security find-identity -v -p codesigning 2>/dev/null | grep -qF "$SIGN_ID"; then
+    codesign --force --deep --sign "$SIGN_ID" --identifier com.perch.daemon "$APP" >/dev/null
+    echo "เซ็นด้วย \"$SIGN_ID\" — สิทธิ์ที่ให้ไว้จะอยู่ข้ามการบิลด์"
+else
+    codesign --force --deep --sign - --identifier com.perch.daemon "$APP" >/dev/null
+    echo "เซ็นแบบ adhoc (ไม่พบ \"$SIGN_ID\") — ต้องกดอนุญาต Bluetooth ใหม่ทุกครั้งที่ติดตั้ง"
+fi
 echo "built $PWD/$APP"
 
 if [ "$INSTALL" = "1" ]; then
