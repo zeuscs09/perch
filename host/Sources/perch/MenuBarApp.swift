@@ -300,12 +300,32 @@ final class MenuBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         prefs.apply(event)
         guard case .wifi(let status) = event else { return }
         lan.noteBoardAddress(status.ip)
+        applyRelay(deviceID: status.deviceID)
         guard let key = LanKey.loadOrCreate() else { return }
         let mine = LanKey.fingerprint(key)
         guard status.keyFingerprint != mine, !keyPushed else { return }
         keyPushed = true
         Log.info("pushing the lan key to the board (\(mine))")
         ble.sendConfig(WiFiCommand.key(hex: LanKey.hex(key)).payload)
+    }
+
+    /// ตั้ง relay ให้ทาง LAN เมื่อรู้ id ของบอร์ดแล้ว
+    ///
+    /// ไม่มีค่าเริ่มต้น — relay ว่างคือปิดทางนี้ทิ้ง เพราะ relay เป็นเซิร์ฟเวอร์ของใครสักคน
+    /// การใส่ที่อยู่ของเราไว้เป็นค่าโรงงานแปลว่าบอร์ดของทุกคนที่โหลดโปรเจกต์นี้ไปจะวิ่ง
+    /// มาหาเครื่องเรา ซึ่งไม่ควรเกิดขึ้นโดยที่เขาไม่ได้เลือกเอง
+    ///
+    ///     defaults write com.perch.daemon relayHost <ที่อยู่ relay ของคุณ>
+    ///     defaults write com.perch.daemon relayPort -int 7333
+    private func applyRelay(deviceID: String) {
+        let d = UserDefaults.standard
+        guard let host = d.string(forKey: "relayHost"), !host.isEmpty, !deviceID.isEmpty else {
+            lan.setRelay(nil)
+            return
+        }
+        let port = UInt16(d.integer(forKey: "relayPort") == 0 ? 7333
+                                                             : d.integer(forKey: "relayPort"))
+        lan.setRelay(.init(host: host, port: port, deviceID: deviceID))
     }
 
     /// รายการบอร์ดที่สแกนเจอ — หน้าตั้งค่าเป็นที่เดียวที่เลือกได้

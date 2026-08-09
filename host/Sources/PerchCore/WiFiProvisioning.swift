@@ -72,15 +72,21 @@ public struct WiFiStatus: Equatable, Sendable {
     /// มีไว้ตอบคำถามเดียว: กุญแจสองฝั่งตรงกันไหม ถ้าไม่ตรง เฟรมบน LAN จะถูกทิ้งทุกก้อน
     /// โดยไม่มีอาการอื่นให้เห็นเลยนอกจากจอที่ค้าง
     public let keyFingerprint: String
+    /// id ที่บอร์ดใช้แนะนำตัวกับ relay — บอร์ดสร้างเอง Mac แค่จำไปใช้
+    ///
+    /// **เป็นความลับ ไม่ใช่ชื่อ**: relay ไม่มีกุญแจไว้ยืนยันตัวตนใคร คนที่รู้ id นี้เตะ
+    /// บอร์ดหลุดได้ (อ่านข้อมูลไม่ได้ เพราะปิดผนึก AES-GCM ปลายทางถึงปลายทาง)
+    public let deviceID: String
 
     public init(state: State, ssid: String, ip: String, error: String?, saved: [String],
-                keyFingerprint: String = "") {
+                keyFingerprint: String = "", deviceID: String = "") {
         self.state = state
         self.ssid = ssid
         self.ip = ip
         self.error = error
         self.saved = saved
         self.keyFingerprint = keyFingerprint
+        self.deviceID = deviceID
     }
 }
 
@@ -118,7 +124,8 @@ public enum BoardEvent: Equatable, Sendable {
                     ip: object["ip"] as? String ?? "",
                     error: error,
                     saved: object["nets"] as? [String] ?? [],
-                    keyFingerprint: object["kf"] as? String ?? ""))
+                    keyFingerprint: object["kf"] as? String ?? "",
+                    deviceID: object["did"] as? String ?? ""))
 
         default:
             return nil

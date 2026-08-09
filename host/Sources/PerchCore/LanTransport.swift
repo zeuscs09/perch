@@ -26,11 +26,40 @@ public final class LanTransport: Transport {
     private var pending: Data?
     private var retry: DispatchWorkItem?
     private var backoff: TimeInterval = 2
+    /// นับความพยายามเพื่อหมุนปลายทาง — รีเซ็ตเมื่อต่อติด
+    private var attempts = 0
 
     private var manual: String?
     private var lastKnown: String?
 
+    /// relay กลางทางสำหรับตอนอยู่คนละเครือข่ายกับบอร์ด (issue #1)
+    ///
+    /// เป็น *ทางเลือกสุดท้าย* เสมอ ไม่ใช่ทางแรก: ในบ้านต่อตรงถึงบอร์ดใช้เวลาไม่ถึง
+    /// มิลลิวินาที ส่วนผ่าน relay ที่เยอรมนีวัดได้ 210 ms — ต่างกัน 200 เท่า การเลือก
+    /// relay ทั้งที่บอร์ดอยู่ห้องเดียวกันจึงเป็นการจ่ายค่าเดินทางฟรีๆ
+    public struct Relay: Equatable {
+        public let host: String
+        public let port: UInt16
+        public let deviceID: String
+        public init(host: String, port: UInt16, deviceID: String) {
+            self.host = host
+            self.port = port
+            self.deviceID = deviceID
+        }
+    }
+    private var relay: Relay?
+    /// สายที่เปิดอยู่ตอนนี้วิ่งผ่าน relay หรือเปล่า — ตัดสินว่าต้องแนะนำตัวก่อนไหม
+    private var viaRelay = false
+
     public init() {}
+
+    public func setRelay(_ value: Relay?) {
+        queue.async { [weak self] in
+            guard let self, value != self.relay else { return }
+            self.relay = value
+            if self.running { self.reconnect(after: 0) }
+        }
+    }
 
     /// ที่อยู่ที่ผู้ใช้กรอกเองในหน้าตั้งค่า — ว่างคือให้หาเอง
     public func setManualHost(_ host: String?) {
@@ -114,16 +143,29 @@ public final class LanTransport: Transport {
         self.browser = browser
     }
 
-    private func endpoint() -> NWEndpoint? {
-        if let manual {
-            return .hostPort(host: NWEndpoint.Host(manual), port: .init(rawValue: LanWire.port)!)
+    /// ปลายทางถัดไปที่จะลอง พร้อมบอกว่ามันคือ relay หรือไม่
+    ///
+    /// **หมุนไปตัวถัดไปทุกครั้งที่ล้ม** ไม่ใช่ลองอันเดิมซ้ำตลอดไป — รอบแรกผมเขียนให้คืน
+    /// ตัวที่ลำดับสูงสุดเสมอ ซึ่งแปลว่าถ้า `lastKnown` (IP ที่บอร์ดเคยรายงานมา) ใช้ไม่ได้
+    /// เพราะย้ายเครือข่ายไปแล้ว relay จะไม่มีวันถูกลองเลย มันจึงไม่ใช่ fallback
+    /// เป็นแค่ลำดับความสำคัญที่ติดอยู่กับตัวเลือกที่ตายแล้ว
+    ///
+    /// ทางตรงยังมาก่อนเสมอในหนึ่งรอบ — relay อยู่ท้ายสุดเพราะอ้อมไปอีกทวีป (วัดได้ 210 ms
+    /// เทียบกับไม่ถึงมิลลิวินาทีในบ้าน) แต่มันจะถูกลองภายในไม่กี่รอบถ้าทางตรงล้มหมด
+    private func endpoint() -> (NWEndpoint, viaRelay: Bool)? {
+        func direct(_ host: String) -> NWEndpoint {
+            .hostPort(host: NWEndpoint.Host(host), port: .init(rawValue: LanWire.port)!)
         }
-        if let discovered { return discovered }
-        if let lastKnown {
-            return .hostPort(
-                host: NWEndpoint.Host(lastKnown), port: .init(rawValue: LanWire.port)!)
+        var options: [(NWEndpoint, Bool)] = []
+        if let manual { options.append((direct(manual), false)) }
+        if let discovered { options.append((discovered, false)) }
+        if let lastKnown { options.append((direct(lastKnown), false)) }
+        if let relay {
+            options.append((.hostPort(host: NWEndpoint.Host(relay.host),
+                                      port: .init(rawValue: relay.port)!), true))
         }
-        return nil
+        guard !options.isEmpty else { return nil }
+        return options[attempts % options.count]
     }
 
     // --- การเชื่อมต่อ --------------------------------------------------------
@@ -135,14 +177,17 @@ public final class LanTransport: Transport {
             reconnect(after: 30)
             return
         }
-        guard let target = endpoint() else {
+        guard let (target, useRelay) = endpoint() else {
             onStatus?("looking for the board on this network")
             reconnect(after: 5)
             return
         }
+        viaRelay = useRelay
 
         let options = NWProtocolTCP.Options()
-        options.connectionTimeout = 5
+        // ผ่าน relay ข้ามทวีปต้องให้เวลามากกว่าในบ้าน — วัดได้ 210 ms ไป-กลับ และการ
+        // จับมือ TCP ใช้หลายรอบ 5 วินาทีเคยพอสำหรับ LAN แต่ตัดสายที่กำลังจะติดทิ้งได้
+        options.connectionTimeout = useRelay ? 15 : 5
         options.enableKeepalive = true
         options.keepaliveIdle = 10
         let connection = NWConnection(to: target, using: NWParameters(tls: nil, tcp: options))
@@ -156,6 +201,12 @@ public final class LanTransport: Transport {
     private func stateChanged(_ state: NWConnection.State, key: Data) {
         switch state {
         case .ready:
+            // relay ไม่รู้ว่าใครเป็นใครจนกว่าจะมีคนบอก — บรรทัดเดียวนี้คือทั้งหมดที่มัน
+            // ต้องการเพื่อจับคู่เรากับบอร์ด หลังจากนั้นมันเป็นท่อเปล่า ไม่แตะอะไรอีก
+            if viaRelay, let relay {
+                connection?.send(content: Data("H \(relay.deviceID)\n".utf8),
+                                 completion: .idempotent)
+            }
             readGreeting(key: key)
         case .failed(let error):
             Log.debug("lan: connection failed (\(error))")
@@ -192,6 +243,7 @@ public final class LanTransport: Transport {
                 self.sealer = sealer
                 self.isConnected = true
                 self.backoff = 2
+                self.attempts = 0
                 Log.info("lan: board reached, counter continues from \(hello.counter)")
                 self.onStatus?("connected over Wi-Fi")
                 self.watchForClose()
@@ -256,6 +308,7 @@ public final class LanTransport: Transport {
         guard running else { return }
         // เพดาน 30 วิ ไม่ใช่การเลิกลอง: บอร์ดที่หายไปเพราะเราเตอร์รีบูตจะกลับมาเอง และ
         // ไม่มีใครมากดปุ่ม — เหตุผลเดียวกับ backoff ฝั่ง firmware
+        attempts &+= 1
         backoff = min(30, max(2, backoff * 2))
         retry?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.attempt() }
