@@ -150,11 +150,14 @@ Codex กับ Antigravity ไม่มีระบบ hook ให้ติด�
 พิมพ์สองชิ้น ไม่ต้อง support ไม่ต้องใช้สกรูเพิ่มนอกจากสี่ตัวที่ติดมากับบอร์ด ฝาหน้าเป็นกรอบให้บอร์ดวางลงไป
 ฝาหลังมีลายมาสคอตกับช่องให้ไฟสถานะลอดออกมา
 
-| | |
-|---|---|
-| **[front_case_v4_slot.stl](hardware/case/front_case_v4_slot.stl)** | ฝาหน้า — ช่องพอร์ตเป็นช่องยาวช่องเดียว ครอบทั้ง USB-C และ micro-USB |
-| **[back_cover.stl](hardware/case/back_cover.stl)** | ฝาหลัง — ลายมาสคอตเซาะที่ผิวนอก มีช่องระบายให้ไฟ LED |
-| **[PRINT_NOTE.txt](hardware/case/PRINT_NOTE.txt)** | ค่าที่ต้องตั้ง อ่านก่อนสั่งพิมพ์ |
+| ชิ้นส่วน | คืออะไร | |
+|---|---|---|
+| **[front_case_v4_slot.stl](hardware/case/front_case_v4_slot.stl)** | ฝาหน้า — ช่องพอร์ตเป็นช่องยาวช่องเดียว ครอบทั้ง USB-C และ micro-USB | [**⬇ โหลด**](hardware/case/front_case_v4_slot.stl?raw=1) |
+| **[back_cover.stl](hardware/case/back_cover.stl)** | ฝาหลัง — ลายมาสคอตเซาะที่ผิวนอก มีช่องระบายให้ไฟ LED | [**⬇ โหลด**](hardware/case/back_cover.stl?raw=1) |
+| **[PRINT_NOTE.txt](hardware/case/PRINT_NOTE.txt)** | ค่าที่ต้องตั้ง อ่านก่อนสั่งพิมพ์ | [**⬇ โหลด**](hardware/case/PRINT_NOTE.txt?raw=1) |
+
+<sub>กดที่ชื่อไฟล์ GitHub จะเรนเดอร์ STL เป็นโมเดลให้หมุนดูก่อนตัดสินใจพิมพ์
+ส่วนช่องขวาคือโหลดไฟล์ตรงๆ เลย</sub>
 
 <p align="center">
   <img src="docs/images/photo-four-up.jpg" width="620" alt="ภาพสตูดิโอครบสี่ด้าน: นาฬิกา · การ์ด session · โควตา · ฝาหลังที่เซาะลาย">

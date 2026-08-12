@@ -157,11 +157,14 @@ Two printed parts, no supports, no screws beyond the four that come with the boa
 front is a bezel the board drops into; the back carries the three mascots and lets the
 status LED through.
 
-| | |
-|---|---|
-| **[front_case_v4_slot.stl](hardware/case/front_case_v4_slot.stl)** | the bezel — one long slot covers both the USB-C and micro-USB ports |
-| **[back_cover.stl](hardware/case/back_cover.stl)** | the back — mascots engraved on the outside, vents for the LED |
-| **[PRINT_NOTE.txt](hardware/case/PRINT_NOTE.txt)** | settings that matter, in Thai and worth reading |
+| Part | What it is | |
+|---|---|---|
+| **[front_case_v4_slot.stl](hardware/case/front_case_v4_slot.stl)** | the bezel — one long slot covers both the USB-C and micro-USB ports | [**⬇ download**](hardware/case/front_case_v4_slot.stl?raw=1) |
+| **[back_cover.stl](hardware/case/back_cover.stl)** | the back — mascots engraved on the outside, vents for the LED | [**⬇ download**](hardware/case/back_cover.stl?raw=1) |
+| **[PRINT_NOTE.txt](hardware/case/PRINT_NOTE.txt)** | settings that matter, in Thai and worth reading | [**⬇ download**](hardware/case/PRINT_NOTE.txt?raw=1) |
+
+<sub>Click a filename and GitHub renders the STL as a model you can spin before you commit
+a print; the download column gives you the file straight away.</sub>
 
 <p align="center">
   <img src="docs/images/photo-four-up.jpg" width="620" alt="Studio view of all four faces: clock, session cards, quota, and the engraved back cover">
