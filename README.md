@@ -27,6 +27,7 @@
   <a href="#what-you-need">What you need</a> ·
   <a href="#1-get-the-repository-and-the-swift-compiler">Getting started</a> ·
   <a href="#the-case">The case</a> ·
+  <a href="#on-the-go">On the go</a> ·
   <a href="#troubleshooting">Troubleshooting</a>
 </p>
 
@@ -344,6 +345,51 @@ channel as your Wi-Fi password, and the board is found over mDNS — the address
 bottom of the tab is only for networks that filter it.
 
 The board still never talks to claude.ai; your session key never leaves the Mac.
+
+## On the go
+
+Both links so far assume the Mac and the board can reach each other: Bluetooth wants about
+ten metres, and the LAN path wants the same network. Step outside either and the screen
+stops moving. If you want it on a hotel desk or in a café, there are two routes — at very
+different stages of proof.
+
+Public Wi-Fi is not one of them. Captive portals need a browser the board does not have.
+Use your phone's hotspot instead, which has no login page. And bring power: the case has
+no battery, so a USB power bank is what keeps it alive.
+
+**Route 1 — Tailscale.** Your phone shares a hotspot, the board joins it, the phone runs
+Tailscale as a subnet router advertising that hotspot's subnet, and the Mac runs with
+`--accept-routes`. The Mac then reaches the board at its hotspot address as though it were
+sitting on your LAN — nothing to run, nothing to host. Two catches: **the phone has to be
+Android**, because iOS cannot act as a subnet router, and the hotspot subnet must not
+collide with your home one. Tested on foot a long way from home, with the screen still
+updating.
+
+**Route 2 — a relay you run.** The board dials *out* to a relay, the Mac dials *out* to the
+same relay, and they meet in the middle, so NAT stops being a problem for either side. Any
+phone's hotspot works and Tailscale is not involved.
+
+The relay holds no key. The payload is sealed with AES-256-GCM before it leaves either
+end, so the relay only ever moves ciphertext and needs no TLS of its own — which is what
+makes this fit at all: a TLS handshake wants 20–40 KB, the board's lowest measured free
+heap is 26.8 KB, and an outbound TCP socket costs 556 bytes. [`relay/perch-relay.py`](relay/perch-relay.py)
+is about 140 lines with no dependencies.
+
+```bash
+defaults write com.perch.daemon relayHost <your relay's address>
+defaults write com.perch.daemon relayPort -int 7333
+```
+
+There is no default address, and an empty one disables the route. A relay is somebody's
+server; shipping one as a factory default would point every board cloned from this repo at
+a machine whose owner never agreed to it.
+
+> **Where route 2 actually stands.** The board half is proven — it dialled out from a phone
+> hotspot on a mobile IP, and the address survives reflashing firmware built without it.
+> The Mac half has never once executed, because the direct LAN path won every time it was
+> tested. The code is written and reads correctly, which is not the same as working. If you
+> try it, [issue #1](https://github.com/zeuscs09/perch/issues/1) is where to say what
+> happened.
 
 ## Troubleshooting
 
