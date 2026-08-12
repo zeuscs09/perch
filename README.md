@@ -26,8 +26,16 @@
   <a href="#what-the-screen-says">What the screen says</a> ·
   <a href="#what-you-need">What you need</a> ·
   <a href="#1-get-the-repository-and-the-swift-compiler">Getting started</a> ·
+  <a href="#the-case">The case</a> ·
   <a href="#troubleshooting">Troubleshooting</a>
 </p>
+
+<p align="center">
+  <img src="docs/images/photo-desk-row.jpg" width="860" alt="Four Perch units side by side on a desk: the clock, two sessions with status cards, the quota screen, and the back cover with its engraved mascots and status LED">
+</p>
+
+<p align="center"><sub>Left to right: the clock it becomes after 21:00 · sessions that need
+you · quota and machine load · the back, with the status LED and the three species engraved.</sub></p>
 
 > **Before you start**
 > - **macOS only.** The app that talks to Claude Code is a Swift menu bar app for macOS 14
@@ -138,6 +146,41 @@ sends a small commission here. Any seller's ESP32-2432S028R works just as well.<
 
 The Mac app is always built from source. The firmware you can either download or build —
 step 2 has both routes.
+
+A case is optional — the board works fine bare. If you have a printer or a print shop,
+[the case](#the-case) is two parts and needs no supports.
+
+## The case
+
+Two printed parts, no supports, no screws beyond the four that come with the board. The
+front is a bezel the board drops into; the back carries the three mascots and lets the
+status LED through.
+
+| | |
+|---|---|
+| **[front_case_v4_slot.stl](hardware/case/front_case_v4_slot.stl)** | the bezel — one long slot covers both the USB-C and micro-USB ports |
+| **[back_cover.stl](hardware/case/back_cover.stl)** | the back — mascots engraved on the outside, vents for the LED |
+| **[PRINT_NOTE.txt](hardware/case/PRINT_NOTE.txt)** | settings that matter, in Thai and worth reading |
+
+<p align="center">
+  <img src="docs/images/photo-four-up.jpg" width="620" alt="Studio view of all four faces: clock, session cards, quota, and the engraved back cover">
+</p>
+
+**Two settings decide whether it looks good**, and neither is the one people reach for
+first. Print it in **4–5 perimeters with 5–6 solid top layers** — thin walls let the
+screen's backlight glow through the plastic at night, and no amount of infill fixes it
+(40% is plenty). A darker filament helps for the same reason.
+
+Print the front face-down on the bed and the back engraving-side up. The engraving floor
+is a top surface, so give it those solid layers or it comes out furry.
+
+<p align="center">
+  <img src="docs/images/photo-desk-angled.jpg" width="420" alt="Three units angled on a desk with the back cover behind them">
+  <img src="docs/images/photo-night.jpg" width="420" alt="A single unit on a nightstand at night, showing the clock face">
+</p>
+
+<sub>These STLs are what we print and test-fit ourselves. They fit the ESP32-2432S028R
+listed above; other boards with the same screen are not guaranteed to match.</sub>
 
 ## 1. Get the repository and the Swift compiler
 
